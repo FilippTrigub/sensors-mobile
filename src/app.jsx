@@ -263,7 +263,7 @@ export class Application extends React.Component {
                         {isShowLoading ? <Spinner /> : <></>}
                         {alert != null ? <Alert variant={alert.variant}>{alert.msg}</Alert> : <></>}
                         {isShowBtnInstall ? <Button onClick={this.handleInstallSensors}>{_('Install')}</Button> : <></>}
-                        {hidedCards.length > 0 ? <Button onClick={() => this.handleShowHidedCards()}>{_('Show hided cards')}</Button> : <></>}
+                        {hidedCards.length > 0 ? <Button onClick={() => this.handleShowHidedCards()}>{_('Show hidden cards')}</Button> : <></>}
 
                         {sensors !== null
                             ? Object.entries(sensors).map((key, keyIndex) => {
