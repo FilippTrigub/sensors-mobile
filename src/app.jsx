@@ -154,7 +154,7 @@ export class Application extends React.Component {
     installCmd = null;
     getLmSensorsInstallCmd = async (index) => {
         const cmd = this.lstPacktsManager[index];
-        await cockpit.spawn([cmd, "-v"])
+        await cockpit.spawn(["which", cmd])
                 .then((sucesso) => {
                     switch (cmd) {
                     case "apk":
