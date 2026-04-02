@@ -29,7 +29,7 @@ Cockpit Sensors Module
 # ignore pre-built bundle in release tarball and rebuild it
 # but keep it in RHEL/CentOS-8, as that has a too old nodejs
 %if ! 0%{?rhel} || 0%{?rhel} >= 9
-rm -rf dist
+rm -rf dist runtime-npm-modules.txt metafile.json
 %endif
 
 %build
