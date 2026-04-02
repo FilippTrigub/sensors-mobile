@@ -3,19 +3,19 @@ PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' packa
 RPM_NAME := cockpit-$(PACKAGE_NAME)
 VERSION := $(shell T=$$(git describe 2>/dev/null) || T=1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
-TEST_OS = centos-8-stream
+TEST_OS = centos-9-stream
 endif
 export TEST_OS
-TARFILE=$(RPM_NAME).tar.xz
-NODE_CACHE=$(RPM_NAME)-node.tar.xz
+TARFILE=$(RPM_NAME)-$(VERSION).tar.xz
+NODE_CACHE=$(RPM_NAME)-node-$(VERSION).tar.xz
 SPEC=$(RPM_NAME).spec
 PREFIX ?= /usr/local
-APPSTREAMFILE=org.cockpit-project.$(PACKAGE_NAME).metainfo.xml
+APPSTREAMFILE=org.cockpit_project.$(subst -,_,$(PACKAGE_NAME)).metainfo.xml
 VM_IMAGE=$(CURDIR)/test/images/$(TEST_OS)
 # stamp file to check for node_modules/
 NODE_MODULES_TEST=package-lock.json
-# one example file in dist/ from bundler to check if that already ran
-DIST_TEST=dist/manifest.json
+# build.js ran in non-watch mode
+DIST_TEST=runtime-npm-modules.txt
 # one example file in pkg/lib to check if it was already checked out
 COCKPIT_REPO_STAMP=pkg/lib/cockpit-po-plugin.js
 # common arguments for tar, mostly to make the generated tarballs reproducible
@@ -29,11 +29,11 @@ all: $(DIST_TEST)
 COCKPIT_REPO_FILES = \
 	pkg/lib \
 	test/common \
-	test/static-code \
+	tools/node-modules \
 	$(NULL)
 
 COCKPIT_REPO_URL = https://github.com/cockpit-project/cockpit.git
-COCKPIT_REPO_COMMIT = 7fec09ed0e4569b02336f5d5da15cd86b011a648 # 341.1 + 13 commits
+COCKPIT_REPO_COMMIT = 55c69ecfa5af4745aa5abe2ab407f8c4f2e7b857 # 358 + 21 commits
 
 
 $(COCKPIT_REPO_FILES): $(COCKPIT_REPO_STAMP)
@@ -50,20 +50,21 @@ $(COCKPIT_REPO_STAMP): Makefile
 LINGUAS=$(basename $(notdir $(wildcard po/*.po)))
 
 po/$(PACKAGE_NAME).js.pot:
-	xgettext --default-domain=$(PACKAGE_NAME) --output=$@ --language=C --keyword= \
+	xgettext --default-domain=$(PACKAGE_NAME) --output=- --language=C --keyword= \
 		--add-comments=Translators: \
 		--keyword=_:1,1t --keyword=_:1c,2,2t --keyword=C_:1c,2 \
 		--keyword=N_ --keyword=NC_:1c,2 \
 		--keyword=gettext:1,1t --keyword=gettext:1c,2,2t \
 		--keyword=ngettext:1,2,3t --keyword=ngettext:1c,2,3,4t \
 		--keyword=gettextCatalog.getString:1,3c --keyword=gettextCatalog.getPlural:2,3,4c \
-		--from-code=UTF-8 $$(find src/ -name '*.js' -o -name '*.jsx')
+		--from-code=UTF-8 $$(find src/ -name '*.[jt]s' -o -name '*.[jt]sx') | \
+		sed '/^#/ s/, c-format//' > $@
 
 po/$(PACKAGE_NAME).html.pot: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
-	pkg/lib/html2po.js -o $@ $$(find src -name '*.html')
+	pkg/lib/html2po -o $@ $$(find src -name '*.html')
 
-po/$(PACKAGE_NAME).manifest.pot: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
-	pkg/lib/manifest2po.js src/manifest.json -o $@
+po/$(PACKAGE_NAME).manifest.pot: $(COCKPIT_REPO_STAMP)
+	pkg/lib/manifest2po -o $@ src/manifest.json
 
 po/$(PACKAGE_NAME).metainfo.pot: $(APPSTREAMFILE)
 	xgettext --default-domain=$(PACKAGE_NAME) --output=$@ $<
@@ -78,8 +79,8 @@ po/LINGUAS:
 # Build/Install/dist
 #
 
-$(SPEC): packaging/$(SPEC).in $(NODE_MODULES_TEST)
-	provides=$$(npm ls --omit dev --package-lock-only --depth=Infinity | grep -Eo '[^[:space:]]+@[^[:space:]]+' | sort -u | sed 's/^/Provides: bundled(npm(/; s/\(.*\)@/\1)) = /'); \
+$(SPEC): packaging/$(SPEC).in $(DIST_TEST)
+	provides=$$(awk '{print "Provides: bundled(npm(" $$1 ")) = " $$2}' runtime-npm-modules.txt); \
 	awk -v p="$$provides" '{gsub(/%{VERSION}/, "$(VERSION)"); gsub(/%{NPM_PROVIDES}/, p)}1' $< > $@
 
 $(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js
@@ -92,6 +93,7 @@ clean:
 	rm -rf dist/
 	rm -f $(SPEC)
 	rm -f po/LINGUAS
+	rm -f metafile.json runtime-npm-modules.txt
 
 install: $(DIST_TEST) po/LINGUAS
 	mkdir -p $(DESTDIR)$(PREFIX)/share/cockpit/$(PACKAGE_NAME)
@@ -126,10 +128,11 @@ $(TARFILE): $(DIST_TEST) $(SPEC)
 	if type appstream-util >/dev/null 2>&1; then appstream-util validate-relax --nonet *.metainfo.xml; fi
 	tar --xz $(TAR_ARGS) -cf $(TARFILE) --transform 's,^,$(RPM_NAME)/,' \
 		--exclude packaging/$(SPEC).in --exclude node_modules \
-		$$(git ls-files) $(COCKPIT_REPO_FILES) $(NODE_MODULES_TEST) $(SPEC) dist/
+		$$(git ls-files) $(COCKPIT_REPO_FILES) $(NODE_MODULES_TEST) $(DIST_TEST) \
+		$(SPEC) dist/
 
 $(NODE_CACHE): $(NODE_MODULES_TEST)
-	tar --xz $(TAR_ARGS) -cf $@ node_modules
+	tools/node-modules runtime-tar $(NODE_CACHE)
 
 node-cache: $(NODE_CACHE)
 
@@ -158,6 +161,7 @@ rpm: $(TARFILE) $(NODE_CACHE) $(SPEC)
 
 # build a VM with locally built distro pkgs installed
 # disable networking, VM images have mock/pbuilder with the common build dependencies pre-installed
+$(VM_IMAGE): export XZ_OPT=-0
 $(VM_IMAGE): $(TARFILE) $(NODE_CACHE) bots test/vm.install
 	bots/image-customize --no-network --fresh \
 		--upload $(NODE_CACHE):/var/tmp/ --build $(TARFILE) \
@@ -180,8 +184,8 @@ prepare-check: $(NODE_MODULES_TEST) $(VM_IMAGE) test/common
 check: prepare-check
 	test/common/run-tests ${RUN_TESTS_OPTIONS}
 
-codecheck: test/static-code $(NODE_MODULES_TEST)
-	test/static-code
+codecheck: test/common $(NODE_MODULES_TEST)
+	test/common/static-code
 
 # checkout Cockpit's bots for standard test VM images and API to launch them
 bots: $(COCKPIT_REPO_STAMP)
@@ -190,8 +194,8 @@ bots: $(COCKPIT_REPO_STAMP)
 $(NODE_MODULES_TEST): package.json
 	# if it exists already, npm install won't update it; force that so that we always get up-to-date packages
 	rm -f package-lock.json
-	# unset NODE_ENV, skips devDependencies otherwise
-	env -u NODE_ENV npm install --ignore-scripts
+	# unset NODE_ENV, skips devDependencies otherwise; this often hangs, so try a few times
+	for _ in `seq 3`; do timeout 10m env -u NODE_ENV npm install --ignore-scripts && exit 0; done; exit 1
 	env -u NODE_ENV npm prune
 
 .PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm
