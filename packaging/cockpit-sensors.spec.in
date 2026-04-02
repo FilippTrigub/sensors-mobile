@@ -10,6 +10,7 @@ BuildArch: noarch
 ExclusiveArch: %{nodejs_arches} noarch
 BuildRequires: nodejs
 BuildRequires: make
+BuildRequires: jq
 BuildRequires: libappstream-glib
 BuildRequires: gettext
 %if 0%{?rhel} && 0%{?rhel} <= 8
