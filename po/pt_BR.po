@@ -35,7 +35,8 @@ msgstr "Não foi encontrado o lm-sensors, deseja instala-lo?"
 msgid "this version of lm-sensors don't suport output sensors data!"
 msgstr "Essa versão do lm-sensors não tem suporte para saida de dados!"
 
-#: src/app.jsx:250msgid "Show temperature in Fahrenheit"
+#: src/app.jsx:250
+msgid "Show temperature in Fahrenheit"
 msgstr "Exibir temperatura em Fahrenheit"
 
 #: src/app.jsx:257
