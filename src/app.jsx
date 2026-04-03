@@ -153,6 +153,10 @@ export class Application extends React.Component {
     lstPacktsManager = ["apk", "apt-get", "dnf", "zypper"];
     installCmd = null;
     getLmSensorsInstallCmd = async (index) => {
+        if (index >= this.lstPacktsManager.length) {
+            this.setAlert(_('No supported package manager found'), 'danger');
+            return;
+        }
         const cmd = this.lstPacktsManager[index];
         await cockpit.spawn(["which", cmd])
                 .then((sucesso) => {
@@ -256,7 +260,7 @@ export class Application extends React.Component {
                             id="allcards-checkbox"
                             name="allcards-checkbox"
                         />
-                        {isShowLoading ? <Spinner isSVG /> : <></>}
+                        {isShowLoading ? <Spinner /> : <></>}
                         {alert != null ? <Alert variant={alert.variant}>{alert.msg}</Alert> : <></>}
                         {isShowBtnInstall ? <Button onClick={this.handleInstallSensors}>{_('Install')}</Button> : <></>}
                         {hidedCards.length > 0 ? <Button onClick={() => this.handleShowHidedCards()}>{_('Show hided cards')}</Button> : <></>}
