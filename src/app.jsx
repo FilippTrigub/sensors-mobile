@@ -158,7 +158,7 @@ export class Application extends React.Component {
             return;
         }
         const cmd = this.lstPacktsManager[index];
-        await cockpit.spawn(["which", cmd])
+        await cockpit.spawn(["which", cmd], { err: "ignore" })
                 .then((sucesso) => {
                     switch (cmd) {
                     case "apk":
