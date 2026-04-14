@@ -5,7 +5,11 @@ exclude = [
     "node_modules/",
 ]
 line-length = 118
-src = []
+src = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+pythonpath = ["."]
 
 [tool.ruff.lint]
 select = [

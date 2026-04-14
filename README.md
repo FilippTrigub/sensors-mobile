@@ -24,6 +24,57 @@ wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/coc
 - .rpm package:
   [cockpit-sensors.noarch.rpm](https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.noarch.rpm)
 
+## Companion Service (Android Client)
+
+The project includes a Python Flask companion service that provides lm-sensors data to Android clients via HTTP API.
+
+### Installation
+
+1. **Install RPM package** (includes companion service):
+   ```bash
+   sudo dnf install cockpit-sensors.noarch.rpm
+   ```
+
+2. **Start the companion service** (systemd user service):
+   ```bash
+   systemctl --user enable --now cockpit-sensors-host.service
+   ```
+
+3. **Verify service is running**:
+   ```bash
+   systemctl --user status cockpit-sensors-host.service
+   curl http://127.0.0.1:5000/api/v1/sensors
+   ```
+
+### Configuration
+
+The companion service binds to `0.0.0.0:5000` by default for Tailscale/private network access.
+
+**Environment variables** (set in `~/.config/cockpit-sensors-host.env`):
+- `HOST_SERVICE_HOST`: Bind address (default: `0.0.0.0`)
+- `HOST_SERVICE_PORT`: Bind port (default: `5000`)
+- `FLASK_ENV`: Environment (default: `production`, set to `development` for debug)
+
+### Android Client Setup
+
+1. **Install Tailscale** on both Linux host and Android device
+2. **Join the same tailnet** on both devices
+3. **Get host's Tailscale IP**:
+   ```bash
+   tailscale ip
+   ```
+4. **Configure Android app** to connect to `http://[Tailscale-IP]:5000/api/v1/sensors`
+
+### Development Mode
+
+```bash
+# Install dependencies
+pip install -r src/host_service/requirements.txt
+
+# Run service locally
+PYTHONPATH=src python -m host_service
+```
+
 # Prints
 
 ![alt text](https://i.ibb.co/tQ22dF4/cockpit.png)

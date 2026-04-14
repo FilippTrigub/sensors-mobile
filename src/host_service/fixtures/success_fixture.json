@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "host_identity": {
+    "hostname": "dev-server",
+    "fqdn": "dev-server.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [
+    {
+      "name": "nvme-pci-0000:01:00.0",
+      "adapter": "PCI adapter at 0000:01:00.0",
+      "sensors": [
+        {
+          "name": "composite",
+          "raw_name": "composite",
+          "value": 38.5,
+          "unit": "°C",
+          "description": "Overall NVMe temperature"
+        },
+        {
+          "name": "nvme_temp_1",
+          "raw_name": "nvme_temp_1",
+          "value": 36.0,
+          "unit": "°C",
+          "description": "NVMe drive temperature"
+        }
+      ]
+    },
+    {
+      "name": "coretemp-isa-0000",
+      "adapter": "isa adapter",
+      "sensors": [
+        {
+          "name": "coretemp",
+          "raw_name": "Package id 0",
+          "value": 42.3,
+          "unit": "°C",
+          "description": "CPU package temperature"
+        },
+        {
+          "name": "coretemp",
+          "raw_name": "Core 0",
+          "value": 40.0,
+          "unit": "°C",
+          "description": "CPU core 0 temperature"
+        },
+        {
+          "name": "coretemp",
+          "raw_name": "Core 1",
+          "value": 41.5,
+          "unit": "°C",
+          "description": "CPU core 1 temperature"
+        }
+      ]
+    },
+    {
+      "name": "acpi-thermal-zone-0",
+      "adapter": "acpi adapter",
+      "sensors": [
+        {
+          "name": "temperature",
+          "raw_name": "temperature",
+          "value": 32.0,
+          "unit": "°C",
+          "description": "ACPI thermal zone temperature"
+        }
+      ]
+    }
+  ],
+  "status": {
+    "code": "OK",
+    "message": "Sensors data collected successfully",
+    "last_updated": "2026-04-13T21:00:00Z"
+  },
+  "units": {
+    "temperature": "C"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sensor API Contract v1",
+  "description": "Mobile-friendly JSON schema for sensor data from lm-sensors. Contract-first TDD approach.",
+  "type": "object",
+  "required": ["host_identity", "timestamp", "sensor_groups", "status"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "API contract version"
+    },
+    "host_identity": {
+      "type": "object",
+      "required": ["hostname", "fqdn", "platform"],
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short hostname of the Linux host"
+        },
+        "fqdn": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Fully qualified domain name"
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["Linux", "Unknown"],
+          "description": "Operating system platform"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO 8601 timestamp of data collection",
+      "format": "date-time"
+    },
+    "sensor_groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "adapter", "sensors"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Sensor group/chip name (e.g., 'Platform 20150000:00')"
+          },
+          "adapter": {
+            "type": "string",
+            "description": "Adapter identifier (e.g., 'PCI adapter at 0000:00:1f.0')"
+          },
+          "sensors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "value", "unit"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Sensor name (e.g., 'temp1_input', 'fan1_input', 'in1_input')"
+                },
+                "raw_name": {
+                  "type": "string",
+                  "description": "Original lm-sensors name before normalization"
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Sensor reading value (numeric)"
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": ["°C", "°F", "RPM", "V", "mV", "ratio", "unknown"],
+                  "description": "Unit of measurement"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable description of what this sensor measures"
+                }
+              }
+            },
+            "minItems": 0,
+            "description": "Array of sensor readings in this group"
+          }
+        }
+      },
+      "description": "Array of sensor groups/chips"
+    },
+    "status": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["OK", "EMPTY", "ERROR", "STALE"],
+          "description": "Status code indicating data state"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable status message"
+        },
+        "last_updated": {
+          "type": ["string", "null"],
+          "description": "ISO 8601 timestamp of last successful update"
+        }
+      }
+    },
+    "units": {
+      "type": "object",
+      "properties": {
+        "temperature": {
+          "type": "string",
+          "enum": ["C", "F"],
+          "description": "Temperature unit (Celsius or Fahrenheit)"
+        }
+      }
+    }
+  }
+}

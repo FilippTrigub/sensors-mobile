@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "host_identity": {
+    "hostname": "dev-server",
+    "fqdn": "dev-server.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "EMPTY",
+    "message": "No sensor data detected - lm-sensors may not be installed or configured",
+    "last_updated": "2026-04-13T21:00:00Z"
+  },
+  "units": {
+    "temperature": "C"
+  }
+}

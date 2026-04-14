@@ -1,5 +1,5 @@
 Name: cockpit-sensors
-Version: %{VERSION}
+Version: 1.1.43.gb951230
 Release: 1%{?dist}
 Summary: Cockpit Sensors Module
 License: LGPL-2.1-or-later
@@ -27,7 +27,20 @@ BuildRequires: nodejs-esbuild
 Requires: cockpit-bridge
 %{?python3_requires}
 
-%{NPM_PROVIDES}
+Provides: bundled(npm(@patternfly/react-core)) = 6.1.0
+Provides: bundled(npm(@patternfly/react-icons)) = 6.1.0
+Provides: bundled(npm(@patternfly/react-styles)) = 6.4.0
+Provides: bundled(npm(@patternfly/react-tokens)) = 6.4.0
+Provides: bundled(npm(attr-accept)) = 2.2.5
+Provides: bundled(npm(file-selector)) = 2.1.2
+Provides: bundled(npm(focus-trap)) = 7.6.2
+Provides: bundled(npm(prop-types)) = 15.8.1
+Provides: bundled(npm(react)) = 18.3.1
+Provides: bundled(npm(react-dom)) = 18.3.1
+Provides: bundled(npm(react-dropzone)) = 14.4.1
+Provides: bundled(npm(scheduler)) = 0.23.2
+Provides: bundled(npm(tabbable)) = 6.4.0
+Provides: bundled(npm(tslib)) = 2.8.1
 
 # Python host service dependencies
 Requires: python3-flask
@@ -57,9 +70,9 @@ NODE_ENV=production NODE_PATH=/usr/lib/node_modules:$(echo /usr/lib/node_modules
 # drop source maps, they are large and just for debugging
 find %{buildroot}%{_datadir}/cockpit/ -name '*.map' | xargs --no-run-if-empty rm --verbose
 
-# Install systemd user service unit
-install -d -m 0755 %{buildroot}/usr/lib/systemd/user
-install -m 0644 packaging/cockpit-sensors-host.service %{buildroot}/usr/lib/systemd/user/cockpit-sensors-host.service
+# Install systemd service unit
+install -d -m 0755 %{buildroot}%{_sysconfdir}/systemd/user
+install -m 0644 packaging/cockpit-sensors-host.service %{buildroot}%{_sysconfdir}/systemd/user/cockpit-sensors-host.service
 
 # Install Python host service
 install -d -m 0755 %{buildroot}/usr/lib/cockpit-sensors/host_service
@@ -79,11 +92,11 @@ appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
 %license LICENSE dist/index.js.LEGAL.txt
 %{_datadir}/cockpit/*
 %{_datadir}/metainfo/*
-%{_prefix}/lib/systemd/user/cockpit-sensors-host.service
+%{_sysconfdir}/systemd/user/cockpit-sensors-host.service
 %dir /usr/lib/cockpit-sensors
 %dir /usr/lib/cockpit-sensors/host_service
-/usr/lib/cockpit-sensors/host_service/*.py
-/usr/lib/cockpit-sensors/host_service/fixtures/*
-/usr/lib/cockpit-sensors/requirements.txt
+%{/_libdir}/cockpit-sensors/host_service/*.py
+%{_libdir}/cockpit-sensors/host_service/fixtures/*
+%{_libdir}/cockpit-sensors/requirements.txt
 
 %changelog

@@ -24,7 +24,7 @@
 /node_modules/
 /tmp/
 /tools/
- 
+
 # subdirs (/subdir/...)
 /packaging/arch/PKGBUILD
 /packaging/debian/changelog
@@ -33,3 +33,7 @@
 /test/common/
 /test/images/
 /test/static-code
+
+# misc
+.idea
+.sisyphus

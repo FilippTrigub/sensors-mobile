@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "host_identity": {
+    "hostname": "dev-server",
+    "fqdn": "dev-server.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "ERROR",
+    "message": "lm-sensors command failed: command not found",
+    "last_updated": null
+  },
+  "error_details": {
+    "error_code": "LM_SENSORS_NOT_FOUND",
+    "suggestion": "Install lm-sensors package and run sensors-detect"
+  },
+  "units": {
+    "temperature": "C"
+  }
+}
