@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:android_app/presentation/screens/host_setup_screen.dart';
-import 'package:android_app/repositories/host_config_repository.dart';
-import 'package:android_app/models/host_config.dart';
+import 'package:sensors/presentation/screens/host_setup_screen.dart';
+import 'package:sensors/repositories/host_config_repository.dart';
+import 'package:sensors/models/host_config.dart';
 
 /// A test implementation of HostConfigRepository for widget testing
 class TestHostConfigRepository implements HostConfigRepository {
@@ -64,46 +64,46 @@ void main() {
       expect(formFinder, findsOneWidget);
     });
 
-    testWidgets('validates malformed host URL', (tester) async {
+    testWidgets('rejects full URL input and requires only host details', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(home: HostSetupScreen(repository: testRepository)),
       );
 
-      // Enter invalid URL
-      await tester.enterText(find.byType(TextFormField), 'not-a-valid-url');
+      await tester.enterText(
+        find.byType(TextFormField),
+        'http://localhost:5000/api/v1/sensors',
+      );
       await tester.pumpAndSettle();
 
-      // Tap save
       await tester.tap(find.byType(ElevatedButton));
       await tester.pumpAndSettle();
 
-      // Should show error message on the input field
-      expect(find.byType(TextFormField), findsOneWidget);
+      expect(find.text('Enter only the host or host:port'), findsOneWidget);
+      expect(testRepository.savedConfig, isNull);
     });
 
-    testWidgets('saves valid host URL', (tester) async {
+    testWidgets('saves valid host input', (tester) async {
       await tester.pumpWidget(
         MaterialApp(home: HostSetupScreen(repository: testRepository)),
       );
 
-      // Enter a valid host URL
-      const testHostUrl = 'http://localhost:5000/api/v1/sensors';
-      await tester.enterText(find.byType(TextFormField), testHostUrl);
+      const testHostInput = 'localhost:5000';
+      await tester.enterText(find.byType(TextFormField), testHostInput);
       await tester.pumpAndSettle();
 
-      // Tap save button
       await tester.tap(find.byType(ElevatedButton));
       await tester.pumpAndSettle();
 
-      // Verify saveConfig was called
       expect(testRepository.savedConfig, isNotNull);
-
-      // Verify the saved config has the correct URL
-      expect(testRepository.savedConfig!.ipAddress, testHostUrl);
+      expect(testRepository.savedConfig!.ipAddress, testHostInput);
+      expect(testRepository.savedConfig!.displayName, testHostInput);
     });
 
-    testWidgets('displays existing config when loaded', (tester) async {
-      // Setup repository to return existing config
+    testWidgets('displays legacy saved full URL as host input when loaded', (
+      tester,
+    ) async {
       const existingConfig = HostConfig(
         hostId: 'test-host',
         hostname: 'test-hostname',
@@ -117,11 +117,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Should show existing host URL - check for at least one match
-      expect(
-        find.text('http://localhost:5000/api/v1/sensors'),
-        findsAtLeastNWidgets(1),
-      );
+      expect(find.text('localhost:5000'), findsAtLeastNWidgets(1));
     });
   });
 }

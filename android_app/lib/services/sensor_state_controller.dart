@@ -225,6 +225,9 @@ class SensorControllerState {
 /// controller.dispose();
 /// ```
 class SensorStateController extends ChangeNotifier {
+  static const String sensorsPath = '/api/v1/sensors';
+  static const int defaultHostPort = 5000;
+
   /// The API client for HTTP communication
   final SensorApiClient _apiClient;
 
@@ -240,6 +243,9 @@ class SensorStateController extends ChangeNotifier {
 
   /// Current host endpoint URL
   String? _currentEndpointUrl;
+
+  /// Current configured host input (host or host:port)
+  String? _configuredHostInput;
 
   /// Current state
   SensorControllerState _currentState = SensorControllerState.setup();
@@ -270,6 +276,7 @@ class SensorStateController extends ChangeNotifier {
   ///
   /// The first fetch happens immediately, then at regular intervals.
   void startPolling(String endpointUrl) {
+    _configuredHostInput = null;
     if (_pollingTimer != null && _pollingTimer!.isActive) {
       // Already polling, just update URL if changed
       _currentEndpointUrl = endpointUrl;
@@ -297,6 +304,7 @@ class SensorStateController extends ChangeNotifier {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _currentEndpointUrl = null;
+    _configuredHostInput = null;
   }
 
   /// Manually refresh data
@@ -304,7 +312,7 @@ class SensorStateController extends ChangeNotifier {
   /// Triggers an immediate fetch and transitions to [UiState.loading].
   /// Useful for pull-to-refresh or retry actions.
   Future<void> refresh() async {
-    if (_currentEndpointUrl == null) {
+    if (_currentEndpointUrl == null && _configuredHostInput == null) {
       throw StateError('No endpoint configured. Call startPolling first.');
     }
 
@@ -323,7 +331,15 @@ class SensorStateController extends ChangeNotifier {
   /// Transitions from [UiState.setup] to [UiState.loading] and starts polling.
   Future<void> setHostConfig(String hostUrl) async {
     resetToSetup();
-    startPolling(hostUrl);
+    _configuredHostInput = hostUrl.trim();
+    _transitionState(SensorControllerState.loading());
+
+    await _performFetch();
+
+    _pollingTimer = Timer.periodic(
+      Duration(milliseconds: _pollingIntervalMs),
+      (_) => _performFetch(),
+    );
   }
 
   /// Handle error state from failed fetch
@@ -365,18 +381,73 @@ class SensorStateController extends ChangeNotifier {
 
   /// Perform a single fetch attempt
   Future<void> _performFetch() async {
-    if (_currentEndpointUrl == null) {
+    final candidateUrls = _currentEndpointUrl != null
+        ? <String>[_currentEndpointUrl!]
+        : _buildEndpointCandidates(_configuredHostInput);
+
+    if (candidateUrls.isEmpty) {
       return;
     }
 
-    try {
-      final data = await _apiClient.fetchSensors(_currentEndpointUrl!);
-      handleSuccess(data);
-    } on ApiException catch (e) {
-      handleError(e.message);
-    } catch (e) {
-      handleError('Unexpected error: $e');
+    ApiException? lastApiError;
+    Object? lastUnexpectedError;
+
+    for (final candidateUrl in candidateUrls) {
+      try {
+        final data = await _apiClient.fetchSensors(candidateUrl);
+        _currentEndpointUrl = candidateUrl;
+        handleSuccess(data);
+        return;
+      } on ApiException catch (e) {
+        lastApiError = e;
+      } catch (e) {
+        lastUnexpectedError = e;
+      }
     }
+
+    if (lastApiError != null) {
+      handleError(lastApiError.message);
+      return;
+    }
+
+    if (lastUnexpectedError != null) {
+      handleError('Unexpected error: $lastUnexpectedError');
+    }
+  }
+
+  static List<String> _buildEndpointCandidates(String? hostInput) {
+    if (hostInput == null || hostInput.trim().isEmpty) {
+      return const [];
+    }
+
+    final trimmed = hostInput.trim();
+    final legacyUri = Uri.tryParse(trimmed);
+
+    if (legacyUri != null && legacyUri.hasScheme && legacyUri.host.isNotEmpty) {
+      final port = legacyUri.hasPort ? legacyUri.port : defaultHostPort;
+      final alternateScheme = legacyUri.scheme == 'https' ? 'http' : 'https';
+
+      return [
+        _buildEndpointUri(legacyUri.scheme, legacyUri.host, port).toString(),
+        _buildEndpointUri(alternateScheme, legacyUri.host, port).toString(),
+      ];
+    }
+
+    final parsedHost = Uri.tryParse('http://$trimmed');
+    if (parsedHost == null || parsedHost.host.isEmpty) {
+      return const [];
+    }
+
+    final port = parsedHost.hasPort ? parsedHost.port : defaultHostPort;
+
+    return [
+      _buildEndpointUri('https', parsedHost.host, port).toString(),
+      _buildEndpointUri('http', parsedHost.host, port).toString(),
+    ];
+  }
+
+  static Uri _buildEndpointUri(String scheme, String host, int port) {
+    return Uri(scheme: scheme, host: host, port: port, path: sensorsPath);
   }
 
   /// Transition to a new state

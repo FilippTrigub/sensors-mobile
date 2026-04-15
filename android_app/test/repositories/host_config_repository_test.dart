@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:android_app/repositories/user_preferences_repository.dart';
-import 'package:android_app/repositories/host_config_repository.dart';
-import 'package:android_app/models/host_config.dart';
-import 'package:android_app/models/enums.dart';
+import 'package:sensors/repositories/user_preferences_repository.dart';
+import 'package:sensors/repositories/host_config_repository.dart';
+import 'package:sensors/models/host_config.dart';
+import 'package:sensors/models/enums.dart';
 
 void main() {
   setUp(() {

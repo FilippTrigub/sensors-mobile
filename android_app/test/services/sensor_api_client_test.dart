@@ -10,8 +10,8 @@ import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:android_app/services/sensor_api_client.dart';
-import 'package:android_app/models/models.dart';
+import 'package:sensors/services/sensor_api_client.dart';
+import 'package:sensors/models/models.dart';
 
 // Mock HTTP client for testing
 @GenerateMocks([http.Client])

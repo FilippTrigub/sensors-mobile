@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:android_app/models/enums.dart';
+import 'package:sensors/models/enums.dart';
 
 /// Repository for persisting user preferences using SharedPreferences
 class UserPreferencesRepository {

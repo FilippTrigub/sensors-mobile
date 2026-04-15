@@ -28,6 +28,11 @@ wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/coc
 
 The project includes a Python Flask companion service that provides lm-sensors data to Android clients via HTTP API.
 
+Related docs:
+
+- [Automatic startup for the companion host service](docs/automatic-startup.md)
+- [Android app build guide](android_app/docs/build-android-app.md)
+
 ### Installation
 
 1. **Install RPM package** (includes companion service):
@@ -72,7 +77,7 @@ The companion service binds to `0.0.0.0:5000` by default for Tailscale/private n
 pip install -r src/host_service/requirements.txt
 
 # Run service locally
-PYTHONPATH=src python -m host_service
+./tools/start_host_service.sh
 ```
 
 # Prints

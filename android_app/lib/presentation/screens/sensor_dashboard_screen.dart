@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:android_app/services/sensor_state_controller.dart';
-import 'package:android_app/models/models.dart';
+import 'package:sensors/services/sensor_state_controller.dart';
+import 'package:sensors/models/models.dart';
 
 /// Primary dashboard screen for displaying sensor data.
 ///
@@ -16,6 +16,9 @@ class SensorDashboardScreen extends StatefulWidget {
   /// Retry callback - used when in error state
   final Future<void> Function() onRetry;
 
+  /// Clear saved host configuration and return to setup
+  final Future<void> Function() onClearHostConfig;
+
   /// Current temperature unit preference
   final TemperatureUnit currentUnit;
 
@@ -27,6 +30,7 @@ class SensorDashboardScreen extends StatefulWidget {
     required this.controller,
     required this.onRefresh,
     required this.onRetry,
+    required this.onClearHostConfig,
     required this.currentUnit,
     required this.onUnitChanged,
   });
@@ -40,10 +44,15 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sensors'),
+        title: const Text('sensors'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           _buildUnitSelector(context),
+          IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: widget.onClearHostConfig,
+            tooltip: 'Clear Host Configuration',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: widget.onRefresh,
@@ -278,15 +287,27 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
               ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: widget.onRetry,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: widget.onRetry,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                  ),
+                  child: const Text('Retry'),
                 ),
-              ),
-              child: const Text('Retry'),
+                OutlinedButton.icon(
+                  onPressed: widget.onClearHostConfig,
+                  icon: const Icon(Icons.edit_location_alt_outlined),
+                  label: const Text('Change Host'),
+                ),
+              ],
             ),
           ],
         ),

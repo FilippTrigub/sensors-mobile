@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:android_app/models/host_config.dart';
+import 'package:sensors/models/host_config.dart';
 
 /// Repository for persisting the single host configuration using SharedPreferences
 class HostConfigRepository {

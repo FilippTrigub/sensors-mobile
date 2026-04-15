@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:android_app/models/models.dart';
+import 'package:sensors/models/models.dart';
 
 void main() {
   group('SensorData parsing from JSON', () {

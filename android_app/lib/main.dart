@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:android_app/services/sensor_state_controller.dart';
-import 'package:android_app/services/sensor_api_client.dart';
-import 'package:android_app/repositories/host_config_repository.dart';
-import 'package:android_app/repositories/user_preferences_repository.dart';
-import 'package:android_app/presentation/screens/host_setup_screen.dart';
-import 'package:android_app/presentation/screens/sensor_dashboard_screen.dart';
-import 'package:android_app/models/models.dart';
+import 'package:sensors/services/sensor_state_controller.dart';
+import 'package:sensors/services/sensor_api_client.dart';
+import 'package:sensors/repositories/host_config_repository.dart';
+import 'package:sensors/repositories/user_preferences_repository.dart';
+import 'package:sensors/presentation/screens/host_setup_screen.dart';
+import 'package:sensors/presentation/screens/sensor_dashboard_screen.dart';
+import 'package:sensors/models/models.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,6 +84,17 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _handleClearHostConfig() async {
+    await _hostConfigRepository.clearConfig();
+    _controller.resetToSetup();
+
+    if (mounted) {
+      setState(() {
+        _currentHostConfig = null;
+      });
+    }
+  }
+
   Future<void> _handleUnitChanged(TemperatureUnit newUnit) async {
     await _userPrefs.setTemperatureUnit(newUnit);
     if (mounted) {
@@ -100,7 +111,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cockpit Sensors',
+      title: 'sensors',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -144,6 +155,7 @@ class _MyAppState extends State<MyApp> {
           controller: _controller,
           onRefresh: _handleRefresh,
           onRetry: _handleRetry,
+          onClearHostConfig: _handleClearHostConfig,
           currentUnit: snapshot.data!,
           onUnitChanged: _handleUnitChanged,
         );

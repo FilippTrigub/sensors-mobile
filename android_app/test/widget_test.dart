@@ -3,9 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:android_app/main.dart';
-import 'package:android_app/repositories/host_config_repository.dart';
-import 'package:android_app/models/host_config.dart';
+import 'package:sensors/main.dart';
+import 'package:sensors/repositories/host_config_repository.dart';
+import 'package:sensors/models/host_config.dart';
 
 void main() {
   setUp(() async {
@@ -32,7 +32,7 @@ void main() {
     const testConfig = HostConfig(
       hostId: 'test-host',
       hostname: 'test-hostname',
-      ipAddress: 'http://localhost:5000/api/v1/sensors',
+      ipAddress: 'localhost:5000',
       displayName: 'Test Host',
     );
     await repository.saveConfig(testConfig);
@@ -41,7 +41,31 @@ void main() {
     await tester.pumpAndSettle();
 
     // Should show dashboard after pre-configured host
-    expect(find.text('Sensors'), findsOneWidget);
+    expect(find.text('sensors'), findsOneWidget);
     expect(find.byType(AppBar), findsOneWidget);
+  });
+
+  testWidgets('App clears saved host config and returns to setup', (
+    tester,
+  ) async {
+    final repository = HostConfigRepository();
+    const testConfig = HostConfig(
+      hostId: 'test-host',
+      hostname: 'test-hostname',
+      ipAddress: 'localhost:5000',
+      displayName: 'Test Host',
+    );
+    await repository.saveConfig(testConfig);
+
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('sensors'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Clear Host Configuration'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Host Setup'), findsOneWidget);
+    expect(await repository.loadConfig(), isNull);
   });
 }

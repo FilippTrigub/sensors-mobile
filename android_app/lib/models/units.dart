@@ -1,4 +1,4 @@
-import 'package:android_app/models/enums.dart';
+import 'package:sensors/models/enums.dart';
 
 /// User preferences for temperature units
 class Units {

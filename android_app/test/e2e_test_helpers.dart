@@ -1,4 +1,4 @@
-import 'package:android_app/main.dart' as app;
+import 'package:sensors/main.dart' as app;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -18,7 +18,7 @@ Future<void> launchFreshApp(WidgetTester tester) async {
 
 Future<void> enterHostUrlAndSubmit(
   WidgetTester tester,
-  String endpointUrl,
+  String hostInput,
 ) async {
   final Finder hostField = find.byType(TextFormField);
   final Finder saveButton = find.text('Save & Continue');
@@ -26,7 +26,7 @@ Future<void> enterHostUrlAndSubmit(
   expect(hostField, findsOneWidget);
   expect(saveButton, findsOneWidget);
 
-  await tester.enterText(hostField, endpointUrl);
+  await tester.enterText(hostField, hostInput);
   await tester.pump();
   await tester.tap(saveButton);
   await tester.pump();

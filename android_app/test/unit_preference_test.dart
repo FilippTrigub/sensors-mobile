@@ -1,6 +1,6 @@
-import 'package:android_app/models/enums.dart';
-import 'package:android_app/models/sensor.dart';
-import 'package:android_app/repositories/user_preferences_repository.dart';
+import 'package:sensors/models/enums.dart';
+import 'package:sensors/models/sensor.dart';
+import 'package:sensors/repositories/user_preferences_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

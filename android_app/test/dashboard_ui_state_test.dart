@@ -1,12 +1,12 @@
-import 'package:android_app/models/enums.dart';
-import 'package:android_app/models/host_identity.dart';
-import 'package:android_app/models/sensor.dart';
-import 'package:android_app/models/sensor_data.dart';
-import 'package:android_app/models/sensor_group.dart';
-import 'package:android_app/models/sensor_status.dart';
-import 'package:android_app/presentation/screens/sensor_dashboard_screen.dart';
-import 'package:android_app/services/sensor_api_client.dart';
-import 'package:android_app/services/sensor_state_controller.dart';
+import 'package:sensors/models/enums.dart';
+import 'package:sensors/models/host_identity.dart';
+import 'package:sensors/models/sensor.dart';
+import 'package:sensors/models/sensor_data.dart';
+import 'package:sensors/models/sensor_group.dart';
+import 'package:sensors/models/sensor_status.dart';
+import 'package:sensors/presentation/screens/sensor_dashboard_screen.dart';
+import 'package:sensors/services/sensor_api_client.dart';
+import 'package:sensors/services/sensor_state_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
@@ -50,6 +50,7 @@ Future<void> pumpDashboard(
         controller: controller,
         onRefresh: () async {},
         onRetry: () async {},
+        onClearHostConfig: () async {},
         currentUnit: currentUnit,
         onUnitChanged: onUnitChanged,
       ),
@@ -64,6 +65,24 @@ Future<void> pumpDashboard(
 
 void main() {
   group('Dashboard unit preference and grouped rendering', () {
+    testWidgets('error state exposes change host action', (tester) async {
+      final controller = buildController();
+
+      await pumpDashboard(
+        tester,
+        controller: controller,
+        currentUnit: TemperatureUnit.celsius,
+        onUnitChanged: (_) async {},
+      );
+
+      controller.handleError('Failed to connect');
+      await tester.pump();
+
+      expect(find.text('Connection Error'), findsOneWidget);
+      expect(find.text('Change Host'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+    });
+
     testWidgets('renders temperatures in Celsius by default', (tester) async {
       final controller = buildController();
       final data = buildData(

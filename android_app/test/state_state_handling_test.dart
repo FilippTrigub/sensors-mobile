@@ -9,9 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-import 'package:android_app/services/sensor_state_controller.dart';
-import 'package:android_app/services/sensor_api_client.dart';
-import 'package:android_app/models/models.dart';
+import 'package:sensors/services/sensor_state_controller.dart';
+import 'package:sensors/services/sensor_api_client.dart';
+import 'package:sensors/models/models.dart';
 
 void main() {
   group('State and Error Handling', () {
@@ -20,6 +20,68 @@ void main() {
     // ---------------------------------------------------------------------
 
     group('Error state', () {
+      test(
+        'setHostConfig tries https then http on known sensors route',
+        () async {
+          final requestedUris = <Uri>[];
+          final httpClient = MockClient((request) async {
+            requestedUris.add(request.url);
+
+            if (request.url.scheme == 'https') {
+              throw http.ClientException('TLS failed');
+            }
+
+            return http.Response(
+              '{"version":"1.0","host_identity":{"hostname":"test-host","fqdn":"test.local","platform":"Linux"},"timestamp":"2024-01-01T00:00:00Z","sensor_groups":[],"status":{"code":"OK","message":"OK"}}',
+              200,
+              headers: {'Content-Type': 'application/json'},
+            );
+          });
+          final apiClient = SensorApiClient(httpClient: httpClient);
+          final controller = SensorStateController(apiClient: apiClient);
+
+          await controller.setHostConfig('test-host');
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          expect(requestedUris, hasLength(2));
+          expect(
+            requestedUris[0].toString(),
+            'https://test-host:5000/api/v1/sensors',
+          );
+          expect(
+            requestedUris[1].toString(),
+            'http://test-host:5000/api/v1/sensors',
+          );
+          expect(controller.isSuccess, isTrue);
+        },
+      );
+
+      test(
+        'setHostConfig preserves custom port while appending sensors route',
+        () async {
+          final requestedUris = <Uri>[];
+          final httpClient = MockClient((request) async {
+            requestedUris.add(request.url);
+            return http.Response(
+              '{"version":"1.0","host_identity":{"hostname":"test-host","fqdn":"test.local","platform":"Linux"},"timestamp":"2024-01-01T00:00:00Z","sensor_groups":[],"status":{"code":"OK","message":"OK"}}',
+              200,
+              headers: {'Content-Type': 'application/json'},
+            );
+          });
+          final apiClient = SensorApiClient(httpClient: httpClient);
+          final controller = SensorStateController(apiClient: apiClient);
+
+          await controller.setHostConfig('test-host:7443');
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          expect(
+            requestedUris.first.toString(),
+            'https://test-host:7443/api/v1/sensors',
+          );
+          expect(controller.isSuccess, isTrue);
+        },
+      );
+
       test(
         'Network failure transitions to error state with error message',
         () async {

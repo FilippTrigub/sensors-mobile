@@ -7,8 +7,8 @@ import 'dart:async' as _i4;
 import 'dart:convert' as _i5;
 import 'dart:typed_data' as _i7;
 
-import 'package:android_app/models/models.dart' as _i3;
-import 'package:android_app/services/sensor_api_client.dart' as _i8;
+import 'package:sensors/models/models.dart' as _i3;
+import 'package:sensors/services/sensor_api_client.dart' as _i8;
 import 'package:http/http.dart' as _i2;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i6;
