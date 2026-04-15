@@ -6,7 +6,8 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/usr/lib/cockpit-sensors
-ExecStart=/usr/bin/python3 -m host_service
+Environment=PYTHONPATH=/usr/lib/cockpit-sensors
+ExecStart=/usr/lib/cockpit-sensors/venv/bin/python -m host_service
 Restart=on-failure
 RestartSec=5
 EnvironmentFile=-%h/.config/cockpit-sensors-host.env
