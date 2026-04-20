@@ -27,7 +27,20 @@ class TestSensorEndpoint:
     def app_with_stub_collector(self):
         """Create Flask app with a testable collector."""
         app = create_app()
-        app.config["SENSOR_COLLECTOR"] = StubCollector()
+        app.config["SENSOR_COLLECTOR"] = _make_stub_collector()
+        return app
+
+    @pytest.fixture
+    def app_with_telemetry_only_collector(self):
+        """Flask app where sensors fail but telemetry is available."""
+        app = create_app()
+
+        class TelemetryOnlyCollector:
+            def collect(self) -> dict:
+                payload = load_fixture(FixtureType.TELEMETRY_ONLY)
+                return payload
+
+        app.config["SENSOR_COLLECTOR"] = TelemetryOnlyCollector()
         return app
 
     @pytest.fixture
@@ -88,13 +101,27 @@ class TestSensorEndpoint:
         response = app_with_stub_collector.test_client().get("/api/v1/sensors")
         assert response.status_code == 200
 
+    def test_telemetry_only_partial_success_returns_200_with_ok_status(self, app_with_telemetry_only_collector):
+        """Test 2b: Telemetry-only (sensors failed, telemetry ok) returns HTTP 200 with OK."""
+        response = app_with_telemetry_only_collector.test_client().get("/api/v1/sensors")
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert data["status"]["code"] == "OK"
+        assert data["sensor_groups"] == []
+        assert "system_telemetry" in data
+        assert data["system_telemetry"]["cpu"] is not None
+        assert len(data["collection_warnings"]) >= 1
+        assert "source" in data["collection_warnings"][0]
+        assert data["version"] in {"1.0", "1.1"}
+
     def test_success_endpoint_returns_contract_compliant_payload(self, app_with_fixture_success):
         """Test 3: Success response is contract-compliant JSON."""
         response = app_with_fixture_success.test_client().get("/api/v1/sensors")
         data = response.get_json()
 
         assert data is not None
-        assert data["version"] == "1.0"
+        assert data["version"] in {"1.0", "1.1"}
         assert "host_identity" in data
         assert "timestamp" in data
         assert "sensor_groups" in data
@@ -139,12 +166,16 @@ class TestSensorEndpoint:
         assert "application/json" in response.content_type
 
 
+def _make_stub_collector() -> StubCollector:
+    return StubCollector()
+
+
 class StubCollector:
     """Stub collector for testing."""
 
-    def collect(self) -> dict:
-        return {
-            "version": "1.0",
+    def __init__(self) -> None:
+        self._data: dict = {
+            "version": "1.1",
             "host_identity": {
                 "hostname": "stubbed-host",
                 "fqdn": "stubbed-host.local",
@@ -171,5 +202,19 @@ class StubCollector:
                 "message": "Test successful",
                 "last_updated": "2026-04-14T12:30:00Z",
             },
+            "system_telemetry": {
+                "cpu": {"usage_percent": 10.0},
+                "memory": {
+                    "used_bytes": 4000000000,
+                    "total_bytes": 8000000000,
+                    "usage_percent": 50.0,
+                },
+                "network": None,
+                "gpu_devices": [],
+            },
+            "collection_warnings": [],
             "units": {"temperature": "C"},
         }
+
+    def collect(self) -> dict:
+        return self._data

@@ -1,0 +1,37 @@
+{
+  "version": "1.1",
+  "host_identity": {
+    "hostname": "dev-server",
+    "fqdn": "dev-server.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "OK",
+    "message": "System telemetry collected successfully while hardware sensor data is unavailable",
+    "last_updated": "2026-04-13T21:00:00Z"
+  },
+  "system_telemetry": {
+    "cpu": {
+      "usage_percent": 9.25
+    },
+    "memory": {
+      "used_bytes": 2147483648,
+      "total_bytes": 8589934592,
+      "usage_percent": 25.0
+    },
+    "network": null,
+    "gpu_devices": []
+  },
+  "collection_warnings": [
+    {
+      "source": "network",
+      "code": "NETWORK_SAMPLE_UNAVAILABLE",
+      "message": "Network counters could not be sampled during this collection pass"
+    }
+  ],
+  "units": {
+    "temperature": "C"
+  }
+}

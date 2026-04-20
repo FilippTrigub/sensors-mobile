@@ -10,7 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from host_service.app import create_app
 from host_service.sensor_collector import CommandExecutionError, HostSensorCollector, parse_sensors_json
+from host_service.system_telemetry_collector import SystemTelemetryCollector
 
+# ── Fixtures ──────────────────────────────────────────────────────
 
 SENSORS_JSON_OUTPUT = """
 {
@@ -43,6 +45,44 @@ SENSORS_JSON_OUTPUT = """
   }
 }
 """.strip()
+
+_STUB_TELEMETRY = {
+    "cpu": {"usage_percent": 12.5},
+    "memory": {"used_bytes": 4000000000, "total_bytes": 8000000000, "usage_percent": 50.0},
+    "network": None,
+    "gpu_devices": [
+        {
+            "id": "gpu-0",
+            "name": "NVIDIA A100",
+            "vendor": "NVIDIA",
+            "utilization_percent": 45.0,
+            "memory_used_bytes": 10737418240,
+            "memory_total_bytes": 40265318400,
+            "memory_usage_percent": 26.67,
+        }
+    ],
+}
+
+_EMPTY_TELEMETRY = {
+    "cpu": None,
+    "memory": None,
+    "network": None,
+    "gpu_devices": [],
+}
+
+
+class _StubTelemetryCollector(SystemTelemetryCollector):
+    """Stub telemetry collector for testing — delegates collect() to injected data."""
+
+    def __init__(self, data: dict | None = None) -> None:
+        # Skip parent __init__ to avoid real /proc reads
+        self._data = data if data is not None else _STUB_TELEMETRY
+
+    def collect(self) -> dict:
+        return self._data
+
+
+# ── Tests ─────────────────────────────────────────────────────────
 
 
 def test_parse_sensors_json_normalizes_machine_readable_output():
@@ -107,27 +147,28 @@ def test_collector_returns_contract_shaped_success_payload():
             "fqdn": "test-host.local",
             "platform": "Linux",
         },
+        system_telemetry_collector=_StubTelemetryCollector(_STUB_TELEMETRY),
     )
 
     payload = collector.collect()
 
-    assert payload["version"] == "1.0"
+    assert payload["version"] == "1.1"
     assert payload["host_identity"]["hostname"] == "test-host"
     assert payload["timestamp"] == "2026-04-14T12:30:00Z"
-    assert payload["status"] == {
-        "code": "OK",
-        "message": "Sensors data collected successfully",
-        "last_updated": "2026-04-14T12:30:00Z",
-    }
+    assert payload["status"]["code"] == "OK"
+    assert payload["status"]["message"] == "Sensor and telemetry data collected successfully"
+    assert payload["status"]["last_updated"] == "2026-04-14T12:30:00Z"
     assert payload["units"] == {"temperature": "C"}
     assert len(payload["sensor_groups"]) == 2
+    assert payload["system_telemetry"]["cpu"]["usage_percent"] == 12.5
+    assert payload["collection_warnings"] == []
 
 
 def test_sensors_endpoint_uses_configured_collector():
     class StubCollector:
         def collect(self) -> dict:
             return {
-                "version": "1.0",
+                "version": "1.1",
                 "host_identity": {
                     "hostname": "stubbed-host",
                     "fqdn": "stubbed-host.local",
@@ -152,7 +193,53 @@ def test_sensors_endpoint_uses_configured_collector():
     assert response.get_json()["host_identity"]["hostname"] == "stubbed-host"
 
 
-def test_collector_returns_explicit_empty_payload_when_no_readings_exist():
+def test_collector_returns_ok_with_telemetry_when_sensors_fail():
+    def raise_file_not_found(_command: list[str]) -> str:
+        raise FileNotFoundError("sensors")
+
+    collector = HostSensorCollector(
+        command_runner=raise_file_not_found,
+        clock=lambda: datetime(2026, 4, 14, 12, 30, tzinfo=UTC),
+        host_identity_provider=lambda: {
+            "hostname": "test-host",
+            "fqdn": "test-host.local",
+            "platform": "Linux",
+        },
+        system_telemetry_collector=_StubTelemetryCollector(_STUB_TELEMETRY),
+    )
+
+    payload = collector.collect()
+
+    assert payload["version"] == "1.1"
+    assert payload["sensor_groups"] == []
+    assert payload["status"]["code"] == "OK"
+    assert "telemetry" in payload["status"]["message"].lower()
+    assert payload["status"]["last_updated"] == "2026-04-14T12:30:00Z"
+    assert len(payload["collection_warnings"]) == 1
+    assert payload["collection_warnings"][0]["code"] == "LM_SENSORS_NOT_FOUND"
+    assert payload["system_telemetry"]["cpu"]["usage_percent"] == 12.5
+
+
+def test_collector_returns_empty_when_no_sensors_and_no_telemetry():
+    collector = HostSensorCollector(
+        command_runner=lambda command: SENSORS_JSON_OUTPUT,
+        clock=lambda: datetime(2026, 4, 14, 12, 30, tzinfo=UTC),
+        host_identity_provider=lambda: {
+            "hostname": "test-host",
+            "fqdn": "test-host.local",
+            "platform": "Linux",
+        },
+        system_telemetry_collector=_StubTelemetryCollector(_EMPTY_TELEMETRY),
+    )
+
+    payload = collector.collect()
+
+    assert payload["version"] == "1.1"
+    assert payload["status"]["code"] == "OK"
+    assert payload["system_telemetry"]["cpu"] is None
+
+
+def test_collector_returns_explicit_empty_status_when_sensors_empty_and_telemetry_none():
     collector = HostSensorCollector(
         command_runner=lambda command: '{"chip0": {"Adapter": "Virtual adapter"}}',
         clock=lambda: datetime(2026, 4, 14, 12, 30, tzinfo=UTC),
@@ -161,16 +248,16 @@ def test_collector_returns_explicit_empty_payload_when_no_readings_exist():
             "fqdn": "test-host.local",
             "platform": "Linux",
         },
+        system_telemetry_collector=_StubTelemetryCollector(_EMPTY_TELEMETRY),
     )
 
     payload = collector.collect()
 
     assert payload["sensor_groups"] == []
-    assert payload["status"] == {
-        "code": "EMPTY",
-        "message": "No sensor data detected from lm-sensors output",
-        "last_updated": "2026-04-14T12:30:00Z",
-    }
+    assert payload["status"]["code"] == "EMPTY"
+    assert "lm-sensors" in payload["status"]["message"].lower() or "no" in payload["status"]["message"].lower()
+    assert payload["status"]["last_updated"] == "2026-04-14T12:30:00Z"
+    assert "error_details" not in payload
 
 
 @pytest.mark.parametrize(
@@ -196,6 +283,7 @@ def test_collector_returns_explicit_error_payload_for_command_failures(error, er
             "fqdn": "test-host.local",
             "platform": "Linux",
         },
+        system_telemetry_collector=_StubTelemetryCollector(_EMPTY_TELEMETRY),
     )
 
     payload = collector.collect()
@@ -205,3 +293,34 @@ def test_collector_returns_explicit_error_payload_for_command_failures(error, er
     assert message_fragment in payload["status"]["message"]
     assert payload["status"]["last_updated"] is None
     assert payload["error_details"]["error_code"] == error_code
+
+
+def _empty_gpu_telemetry() -> dict:
+    return {
+        "cpu": {"usage_percent": 22.0},
+        "memory": {"used_bytes": 5000000000, "total_bytes": 8000000000, "usage_percent": 62.5},
+        "network": None,
+        "gpu_devices": [],
+    }
+
+
+def test_collector_emits_gpu_warning_when_no_gpu_devices():
+    collector = HostSensorCollector(
+        command_runner=lambda command: SENSORS_JSON_OUTPUT,
+        clock=lambda: datetime(2026, 4, 14, 12, 30, tzinfo=UTC),
+        host_identity_provider=lambda: {
+            "hostname": "test-host",
+            "fqdn": "test-host.local",
+            "platform": "Linux",
+        },
+        system_telemetry_collector=_StubTelemetryCollector(_empty_gpu_telemetry()),
+    )
+
+    payload = collector.collect()
+
+    assert payload["status"]["code"] == "OK"
+    assert len(payload["collection_warnings"]) == 1
+    warning = payload["collection_warnings"][0]
+    assert warning["source"] == "gpu"
+    assert warning["code"] == "GPU_TELEMETRY_UNAVAILABLE"
+    assert "no nvidia driver" in warning["message"].lower()

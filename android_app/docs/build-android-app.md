@@ -67,7 +67,8 @@ Start the host service from the repository root:
 
 ```bash
 cd /home/filipp/Projects/cockpit-sensors
-./tools/start_host_service.sh
+pip install -r src/host_service/requirements.txt
+python -m src.host_service
 ```
 
 If you are using the Android emulator, forward the host service port into the emulator:

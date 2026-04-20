@@ -9,10 +9,18 @@ import socket
 import subprocess
 from typing import Any
 
+from .system_telemetry_collector import SystemTelemetryCollector
+
 
 CommandRunner = Callable[[list[str]], str]
 Clock = Callable[[], datetime]
 HostIdentityProvider = Callable[[], dict[str, str]]
+
+_SUGGESTIONS: dict[str, str] = {
+    "LM_SENSORS_NOT_FOUND": "Install lm-sensors package and run sensors-detect",
+    "SENSORS_COMMAND_FAILED": "Verify the sensors command can run successfully on the host",
+    "SENSORS_PARSE_ERROR": "Verify the installed lm-sensors version supports JSON output (-j)",
+}
 
 
 class CommandExecutionError(Exception):
@@ -28,59 +36,119 @@ class HostSensorCollector:
         command_runner: CommandRunner | None = None,
         clock: Clock | None = None,
         host_identity_provider: HostIdentityProvider | None = None,
+        system_telemetry_collector: SystemTelemetryCollector | None = None,
     ) -> None:
         self._command_runner = command_runner or run_sensors_command
         self._clock = clock or utc_now
         self._host_identity_provider = host_identity_provider or get_host_identity
+        self._system_telemetry_collector = system_telemetry_collector or SystemTelemetryCollector(clock=self._clock)
 
     def collect(self) -> dict[str, Any]:
         timestamp = format_timestamp(self._clock())
         host_identity = self._host_identity_provider()
+        warnings: list[dict[str, str]] = []
 
+        # Always collect telemetry (non-fatal, additive to sensor data)
+        telemetry = self._system_telemetry_collector.collect()
+
+        # Check if GPU telemetry is available; emit non-fatal warning when absent
+        gpu_unavailable = not telemetry.get("gpu_devices", [])
+
+        has_telemetry = any(telemetry.get(key) is not None for key in ("cpu", "memory", "network")) or telemetry.get(
+            "gpu_devices", []
+        )
+
+        # Collect sensors — always attempt, never short-circuit on failure
+        sensor_groups: list[dict[str, Any]] = []
         try:
             raw_output = self._command_runner(["sensors", "-j"])
             sensor_groups = parse_sensors_json(raw_output)
         except FileNotFoundError:
-            return build_error_payload(
-                host_identity=host_identity,
-                timestamp=timestamp,
-                message="lm-sensors command is not available on this host",
-                error_code="LM_SENSORS_NOT_FOUND",
-                suggestion="Install lm-sensors package and run sensors-detect",
+            warnings.append(
+                {
+                    "source": "lm-sensors",
+                    "code": "LM_SENSORS_NOT_FOUND",
+                    "message": "lm-sensors command is not available on this host",
+                }
             )
         except CommandExecutionError as error:
             error_message = error.stderr.strip() or str(error)
-            return build_error_payload(
-                host_identity=host_identity,
-                timestamp=timestamp,
-                message=f"lm-sensors command failed: {error_message}",
-                error_code="SENSORS_COMMAND_FAILED",
-                suggestion="Verify the sensors command can run successfully on the host",
+            warnings.append(
+                {
+                    "source": "lm-sensors",
+                    "code": "SENSORS_COMMAND_FAILED",
+                    "message": f"lm-sensors command failed: {error_message}",
+                }
             )
         except (json.JSONDecodeError, TypeError, ValueError) as error:
-            return build_error_payload(
-                host_identity=host_identity,
-                timestamp=timestamp,
-                message=f"Unable to parse lm-sensors JSON output: {error}",
-                error_code="SENSORS_PARSE_ERROR",
-                suggestion="Verify the installed lm-sensors version supports JSON output (-j)",
+            warnings.append(
+                {
+                    "source": "lm-sensors",
+                    "code": "SENSORS_PARSE_ERROR",
+                    "message": f"Unable to parse lm-sensors JSON output: {error}",
+                }
             )
 
-        if not sensor_groups:
-            return build_empty_payload(host_identity=host_identity, timestamp=timestamp)
+        has_sensors = bool(sensor_groups)
 
-        return {
-            "version": "1.0",
+        # Determine status code with partial-success semantics
+        if has_sensors or has_telemetry:
+            status_code = "OK"
+            if has_sensors and has_telemetry:
+                status_message = "Sensor and telemetry data collected successfully"
+            elif has_sensors:
+                status_message = "Sensor data collected successfully"
+            else:
+                status_message = "System telemetry collected successfully while hardware sensor data is unavailable"
+            last_updated = timestamp
+            error_details: dict[str, str] | None = None
+
+            if gpu_unavailable:
+                warnings.append(
+                    {
+                        "source": "gpu",
+                        "code": "GPU_TELEMETRY_UNAVAILABLE",
+                        "message": "GPU telemetry is not available on this host (no NVIDIA driver detected)",
+                    }
+                )
+        elif warnings:
+            # Warnings but no usable data at all → ERROR
+            primary = warnings[0]
+            status_code = "ERROR"
+            status_message = primary["message"]
+            last_updated = None
+            error_details = {
+                "error_code": primary["code"],
+                "suggestion": _SUGGESTIONS.get(
+                    primary["code"],
+                    "Check host configuration and try again",
+                ),
+            }
+        else:
+            status_code = "EMPTY"
+            status_message = "No sensor data detected - lm-sensors may not be installed or configured"
+            last_updated = timestamp
+            error_details = None
+
+        payload: dict[str, Any] = {
+            "version": "1.1",
             "host_identity": host_identity,
             "timestamp": timestamp,
             "sensor_groups": sensor_groups,
             "status": {
-                "code": "OK",
-                "message": "Sensors data collected successfully",
-                "last_updated": timestamp,
+                "code": status_code,
+                "message": status_message,
+                "last_updated": last_updated,
             },
             "units": {"temperature": "C"},
+            "system_telemetry": telemetry,
+            "collection_warnings": warnings,
         }
+
+        if error_details is not None:
+            payload["error_details"] = error_details
+
+        return payload
 
 
 def utc_now() -> datetime:
@@ -191,43 +259,3 @@ def describe_sensor(raw_name: str, unit: str) -> str:
     if unit == "V":
         return f"{raw_name} voltage"
     return raw_name
-
-
-def build_empty_payload(host_identity: dict[str, str], timestamp: str) -> dict[str, Any]:
-    return {
-        "version": "1.0",
-        "host_identity": host_identity,
-        "timestamp": timestamp,
-        "sensor_groups": [],
-        "status": {
-            "code": "EMPTY",
-            "message": "No sensor data detected from lm-sensors output",
-            "last_updated": timestamp,
-        },
-        "units": {"temperature": "C"},
-    }
-
-
-def build_error_payload(
-    host_identity: dict[str, str],
-    timestamp: str,
-    message: str,
-    error_code: str,
-    suggestion: str,
-) -> dict[str, Any]:
-    return {
-        "version": "1.0",
-        "host_identity": host_identity,
-        "timestamp": timestamp,
-        "sensor_groups": [],
-        "status": {
-            "code": "ERROR",
-            "message": message,
-            "last_updated": None,
-        },
-        "error_details": {
-            "error_code": error_code,
-            "suggestion": suggestion,
-        },
-        "units": {"temperature": "C"},
-    }

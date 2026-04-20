@@ -1,15 +1,165 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Sensor API Contract v1",
-  "description": "Mobile-friendly JSON schema for sensor data from lm-sensors. Contract-first TDD approach.",
+  "title": "Sensor API Contract v1.1",
+  "description": "Mobile-friendly JSON schema for sensor data and optional system telemetry. Contract-first TDD approach.",
   "type": "object",
   "required": ["host_identity", "timestamp", "sensor_groups", "status"],
   "additionalProperties": true,
+  "definitions": {
+    "cpu_telemetry": {
+      "type": "object",
+      "required": ["usage_percent"],
+      "additionalProperties": false,
+      "properties": {
+        "usage_percent": {
+          "type": "number"
+        }
+      }
+    },
+    "memory_telemetry": {
+      "type": "object",
+      "required": ["used_bytes", "total_bytes", "usage_percent"],
+      "additionalProperties": false,
+      "properties": {
+        "used_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "usage_percent": {
+          "type": "number"
+        }
+      }
+    },
+    "network_telemetry": {
+      "type": "object",
+      "required": [
+        "rx_bytes_per_sec",
+        "tx_bytes_per_sec",
+        "total_rx_bytes",
+        "total_tx_bytes",
+        "sample_window_seconds",
+        "interfaces"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rx_bytes_per_sec": {
+          "type": "number"
+        },
+        "tx_bytes_per_sec": {
+          "type": "number"
+        },
+        "total_rx_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_tx_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_window_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "gpu_device": {
+      "type": "object",
+      "required": ["id", "name", "vendor"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vendor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utilization_percent": {
+          "type": ["number", "null"]
+        },
+        "memory_used_bytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "memory_total_bytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "memory_usage_percent": {
+          "type": ["number", "null"]
+        }
+      }
+    },
+    "collection_warning": {
+      "type": "object",
+      "required": ["source", "code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "system_telemetry": {
+      "type": "object",
+      "required": ["cpu", "memory", "network", "gpu_devices"],
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "anyOf": [
+            { "$ref": "#/definitions/cpu_telemetry" },
+            { "type": "null" }
+          ]
+        },
+        "memory": {
+          "anyOf": [
+            { "$ref": "#/definitions/memory_telemetry" },
+            { "type": "null" }
+          ]
+        },
+        "network": {
+          "anyOf": [
+            { "$ref": "#/definitions/network_telemetry" },
+            { "type": "null" }
+          ]
+        },
+        "gpu_devices": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/gpu_device" }
+        }
+      }
+    }
+  },
   "properties": {
     "version": {
       "type": "string",
-      "const": "1.0",
-      "description": "API contract version"
+      "enum": ["1.0", "1.1"],
+      "description": "API contract version. Version 1.1 adds optional telemetry fields while remaining compatible with 1.0 payloads."
     },
     "host_identity": {
       "type": "object",
@@ -114,6 +264,15 @@
           "enum": ["C", "F"],
           "description": "Temperature unit (Celsius or Fahrenheit)"
         }
+      }
+    },
+    "system_telemetry": {
+      "$ref": "#/definitions/system_telemetry"
+    },
+    "collection_warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/collection_warning"
       }
     }
   }

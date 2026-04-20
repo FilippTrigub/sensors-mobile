@@ -358,4 +358,509 @@ void main() {
       expect(units.temperature, isNull);
     });
   });
+
+  // -------------------------------------------------------------------
+  // TELEMETRY PARSING TESTS (v1.1 payloads)
+  // -------------------------------------------------------------------
+
+  group('SensorData telemetry parsing (v1.1)', () {
+    test('parses full 1.1 payload with telemetry and empty warnings', () {
+      final json = '''
+{
+  "version": "1.1",
+  "host_identity": {
+    "hostname": "dev-server",
+    "fqdn": "dev-server.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "OK",
+    "message": "Sensors data collected successfully",
+    "last_updated": "2026-04-13T21:00:00Z"
+  },
+  "system_telemetry": {
+    "cpu": {
+      "usage_percent": 18.4
+    },
+    "memory": {
+      "used_bytes": 6442450944,
+      "total_bytes": 17179869184,
+      "usage_percent": 37.5
+    },
+    "network": {
+      "rx_bytes_per_sec": 2048.5,
+      "tx_bytes_per_sec": 1024.25,
+      "total_rx_bytes": 987654321,
+      "total_tx_bytes": 123456789,
+      "sample_window_seconds": 1.0,
+      "interfaces": ["eth0", "wlan0"]
+    },
+    "gpu_devices": [
+      {
+        "id": "0000:01:00.0",
+        "name": "NVIDIA GeForce RTX 4060",
+        "vendor": "NVIDIA",
+        "utilization_percent": 24.0,
+        "memory_used_bytes": 1073741824,
+        "memory_total_bytes": 8589934592,
+        "memory_usage_percent": 12.5
+      }
+    ]
+  },
+  "collection_warnings": [],
+  "units": {
+    "temperature": "C"
+  }
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      expect(sensorData.version, '1.1');
+      expect(sensorData.systemTelemetry, isNotNull);
+      expect(sensorData.systemTelemetry!.cpu, isNotNull);
+      expect(sensorData.systemTelemetry!.cpu!.usagePercent, 18.4);
+      expect(sensorData.systemTelemetry!.memory, isNotNull);
+      expect(sensorData.systemTelemetry!.memory!.usedBytes, 6442450944);
+      expect(sensorData.systemTelemetry!.memory!.totalBytes, 17179869184);
+      expect(sensorData.systemTelemetry!.memory!.usagePercent, 37.5);
+      expect(sensorData.systemTelemetry!.network, isNotNull);
+      expect(sensorData.systemTelemetry!.network!.rxBytesPerSec, 2048.5);
+      expect(sensorData.systemTelemetry!.network!.txBytesPerSec, 1024.25);
+      expect(sensorData.systemTelemetry!.network!.totalRxBytes, 987654321);
+      expect(sensorData.systemTelemetry!.network!.totalTxBytes, 123456789);
+      expect(sensorData.systemTelemetry!.network!.sampleWindowSeconds, 1.0);
+      expect(sensorData.systemTelemetry!.network!.interfaces, [
+        'eth0',
+        'wlan0',
+      ]);
+      expect(sensorData.systemTelemetry!.gpuDevices.length, 1);
+      expect(sensorData.systemTelemetry!.gpuDevices[0].id, '0000:01:00.0');
+      expect(
+        sensorData.systemTelemetry!.gpuDevices[0].name,
+        'NVIDIA GeForce RTX 4060',
+      );
+      expect(sensorData.systemTelemetry!.gpuDevices[0].vendor, 'NVIDIA');
+      expect(
+        sensorData.systemTelemetry!.gpuDevices[0].utilizationPercent,
+        24.0,
+      );
+      expect(
+        sensorData.systemTelemetry!.gpuDevices[0].memoryUsedBytes,
+        1073741824,
+      );
+      expect(
+        sensorData.systemTelemetry!.gpuDevices[0].memoryTotalBytes,
+        8589934592,
+      );
+      expect(
+        sensorData.systemTelemetry!.gpuDevices[0].memoryUsagePercent,
+        12.5,
+      );
+      expect(sensorData.collectionWarnings, isNotNull);
+      expect(sensorData.collectionWarnings!.isEmpty, true);
+    });
+
+    test('parses telemetry-only payload with warnings and null network', () {
+      final json = '''
+{
+  "version": "1.1",
+  "host_identity": {
+    "hostname": "dev-server",
+    "fqdn": "dev-server.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "OK",
+    "message": "System telemetry collected successfully while hardware sensor data is unavailable",
+    "last_updated": "2026-04-13T21:00:00Z"
+  },
+  "system_telemetry": {
+    "cpu": {
+      "usage_percent": 9.25
+    },
+    "memory": {
+      "used_bytes": 2147483648,
+      "total_bytes": 8589934592,
+      "usage_percent": 25.0
+    },
+    "network": null,
+    "gpu_devices": []
+  },
+  "collection_warnings": [
+    {
+      "source": "network",
+      "code": "NETWORK_SAMPLE_UNAVAILABLE",
+      "message": "Network counters could not be sampled during this collection pass"
+    }
+  ],
+  "units": {
+    "temperature": "C"
+  }
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      expect(sensorData.version, '1.1');
+      expect(sensorData.systemTelemetry, isNotNull);
+      expect(sensorData.systemTelemetry!.cpu!.usagePercent, 9.25);
+      expect(sensorData.systemTelemetry!.memory!.usagePercent, 25.0);
+      expect(sensorData.systemTelemetry!.network, isNull);
+      expect(sensorData.systemTelemetry!.gpuDevices.isEmpty, true);
+      expect(sensorData.collectionWarnings, isNotNull);
+      expect(sensorData.collectionWarnings!.length, 1);
+      expect(sensorData.collectionWarnings![0].source, 'network');
+      expect(
+        sensorData.collectionWarnings![0].code,
+        'NETWORK_SAMPLE_UNAVAILABLE',
+      );
+      expect(
+        sensorData.collectionWarnings![0].message,
+        contains('Network counters'),
+      );
+    });
+
+    test('parses telemetry with null cpu and memory', () {
+      final json = '''
+{
+  "version": "1.1",
+  "host_identity": {
+    "hostname": "test-host",
+    "fqdn": "test.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T22:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "OK",
+    "message": "Telemetry partially available"
+  },
+  "system_telemetry": {
+    "cpu": null,
+    "memory": null,
+    "network": {
+      "rx_bytes_per_sec": 0,
+      "tx_bytes_per_sec": 0,
+      "total_rx_bytes": 0,
+      "total_tx_bytes": 0,
+      "sample_window_seconds": 1.0,
+      "interfaces": []
+    },
+    "gpu_devices": []
+  },
+  "collection_warnings": []
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      expect(sensorData.systemTelemetry!.cpu, isNull);
+      expect(sensorData.systemTelemetry!.memory, isNull);
+      expect(sensorData.systemTelemetry!.network, isNotNull);
+      expect(sensorData.systemTelemetry!.network!.interfaces.isEmpty, true);
+    });
+
+    test('parses GPU device with nullable fields', () {
+      final json = '''
+{
+  "version": "1.1",
+  "host_identity": {
+    "hostname": "gpu-test",
+    "fqdn": "gpu.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T23:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "OK",
+    "message": "OK"
+  },
+  "system_telemetry": {
+    "cpu": { "usage_percent": 5.0 },
+    "memory": { "used_bytes": 1000, "total_bytes": 2000, "usage_percent": 50.0 },
+    "network": {
+      "rx_bytes_per_sec": 0,
+      "tx_bytes_per_sec": 0,
+      "total_rx_bytes": 0,
+      "total_tx_bytes": 0,
+      "sample_window_seconds": 1.0,
+      "interfaces": []
+    },
+    "gpu_devices": [
+      {
+        "id": "0000:02:00.0",
+        "name": "AMD Radeon RX 7800",
+        "vendor": "AMD"
+      }
+    ]
+  },
+  "collection_warnings": []
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      final gpu = sensorData.systemTelemetry!.gpuDevices[0];
+      expect(gpu.id, '0000:02:00.0');
+      expect(gpu.name, 'AMD Radeon RX 7800');
+      expect(gpu.vendor, 'AMD');
+      expect(gpu.utilizationPercent, isNull);
+      expect(gpu.memoryUsedBytes, isNull);
+      expect(gpu.memoryTotalBytes, isNull);
+      expect(gpu.memoryUsagePercent, isNull);
+    });
+
+    test('handles missing telemetry fields as null (backward compatible)', () {
+      final json = '''
+{
+  "host_identity": {
+    "hostname": "no-telemetry",
+    "fqdn": "no-telemetry.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "OK",
+    "message": "OK"
+  }
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      expect(sensorData.systemTelemetry, isNull);
+      expect(sensorData.collectionWarnings, isNull);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // LEGACY 1.0 PAYLOAD TESTS (no telemetry)
+  // -------------------------------------------------------------------
+
+  group('Legacy 1.0 payload backward compatibility', () {
+    test('parses 1.0 payload without telemetry fields successfully', () {
+      final json = '''
+{
+  "version": "1.0",
+  "host_identity": {
+    "hostname": "legacy-host",
+    "fqdn": "legacy.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [
+    {
+      "name": "coretemp-isa-0000",
+      "adapter": "isa adapter",
+      "sensors": [
+        {
+          "name": "Package id 0",
+          "raw_name": "Package id 0",
+          "value": 55.0,
+          "unit": "°C",
+          "description": "CPU package"
+        }
+      ]
+    }
+  ],
+  "status": {
+    "code": "OK",
+    "message": "Sensors collected",
+    "last_updated": "2026-04-13T21:00:00Z"
+  },
+  "units": {
+    "temperature": "C"
+  }
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      expect(sensorData.version, '1.0');
+      expect(sensorData.systemTelemetry, isNull);
+      expect(sensorData.collectionWarnings, isNull);
+      expect(sensorData.sensorGroups.length, 1);
+      expect(sensorData.sensorGroups[0].sensors.length, 1);
+      expect(sensorData.sensorGroups[0].sensors[0].value, 55.0);
+    });
+
+    test('1.0 payload with error_details still works without telemetry', () {
+      final json = '''
+{
+  "version": "1.0",
+  "host_identity": {
+    "hostname": "error-host",
+    "fqdn": "error.local",
+    "platform": "Linux"
+  },
+  "timestamp": "2026-04-13T21:00:00Z",
+  "sensor_groups": [],
+  "status": {
+    "code": "ERROR",
+    "message": "lm-sensors command failed",
+    "last_updated": null
+  },
+  "error_details": {
+    "error_code": "LM_SENSORS_NOT_FOUND",
+    "suggestion": "Install lm-sensors"
+  }
+}
+''';
+
+      final sensorData = SensorData.fromJson(jsonDecode(json));
+
+      expect(sensorData.version, '1.0');
+      expect(sensorData.status.code, SensorStatusCode.error);
+      expect(sensorData.errorDetails, isNotNull);
+      expect(sensorData.errorDetails!['error_code'], 'LM_SENSORS_NOT_FOUND');
+      expect(sensorData.systemTelemetry, isNull);
+      expect(sensorData.collectionWarnings, isNull);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // TELEMETRY MODEL UNIT TESTS
+  // -------------------------------------------------------------------
+
+  group('CpuTelemetry model', () {
+    test('creates CpuTelemetry from JSON', () {
+      final json = {'usage_percent': 42.5};
+      final cpu = CpuTelemetry.fromJson(json);
+      expect(cpu.usagePercent, 42.5);
+    });
+
+    test('round-trips toJson/fromJson', () {
+      final cpu = CpuTelemetry(usagePercent: 15.0);
+      final json = cpu.toJson();
+      final cpu2 = CpuTelemetry.fromJson(json);
+      expect(cpu2.usagePercent, 15.0);
+    });
+  });
+
+  group('MemoryTelemetry model', () {
+    test('creates MemoryTelemetry from JSON', () {
+      final json = {
+        'used_bytes': 4294967296,
+        'total_bytes': 8589934592,
+        'usage_percent': 50.0,
+      };
+      final mem = MemoryTelemetry.fromJson(json);
+      expect(mem.usedBytes, 4294967296);
+      expect(mem.totalBytes, 8589934592);
+      expect(mem.usagePercent, 50.0);
+    });
+  });
+
+  group('NetworkTelemetry model', () {
+    test('creates NetworkTelemetry from JSON', () {
+      final json = {
+        'rx_bytes_per_sec': 1024.0,
+        'tx_bytes_per_sec': 512.0,
+        'total_rx_bytes': 1000000,
+        'total_tx_bytes': 500000,
+        'sample_window_seconds': 2.0,
+        'interfaces': ['eth0'],
+      };
+      final net = NetworkTelemetry.fromJson(json);
+      expect(net.rxBytesPerSec, 1024.0);
+      expect(net.txBytesPerSec, 512.0);
+      expect(net.totalRxBytes, 1000000);
+      expect(net.totalTxBytes, 500000);
+      expect(net.sampleWindowSeconds, 2.0);
+      expect(net.interfaces, ['eth0']);
+    });
+  });
+
+  group('GpuDeviceTelemetry model', () {
+    test('creates GpuDeviceTelemetry with all fields', () {
+      final json = {
+        'id': '0000:01:00.0',
+        'name': 'RTX 4060',
+        'vendor': 'NVIDIA',
+        'utilization_percent': 30.0,
+        'memory_used_bytes': 2000000000,
+        'memory_total_bytes': 8000000000,
+        'memory_usage_percent': 25.0,
+      };
+      final gpu = GpuDeviceTelemetry.fromJson(json);
+      expect(gpu.id, '0000:01:00.0');
+      expect(gpu.utilizationPercent, 30.0);
+      expect(gpu.memoryUsedBytes, 2000000000);
+    });
+
+    test('creates GpuDeviceTelemetry with nullable fields absent', () {
+      final json = {
+        'id': '0000:02:00.0',
+        'name': 'Basic GPU',
+        'vendor': 'Intel',
+      };
+      final gpu = GpuDeviceTelemetry.fromJson(json);
+      expect(gpu.utilizationPercent, isNull);
+      expect(gpu.memoryUsedBytes, isNull);
+    });
+  });
+
+  group('CollectionWarning model', () {
+    test('creates CollectionWarning from JSON', () {
+      final json = {
+        'source': 'gpu',
+        'code': 'GPU_NOT_SUPPORTED',
+        'message': 'GPU telemetry not available',
+      };
+      final warning = CollectionWarning.fromJson(json);
+      expect(warning.source, 'gpu');
+      expect(warning.code, 'GPU_NOT_SUPPORTED');
+      expect(warning.message, 'GPU telemetry not available');
+    });
+  });
+
+  group('SystemTelemetry model', () {
+    test('creates SystemTelemetry with all sub-fields', () {
+      final json = {
+        'cpu': {'usage_percent': 10.0},
+        'memory': {
+          'used_bytes': 1000,
+          'total_bytes': 4000,
+          'usage_percent': 25.0,
+        },
+        'network': {
+          'rx_bytes_per_sec': 100,
+          'tx_bytes_per_sec': 50,
+          'total_rx_bytes': 1000,
+          'total_tx_bytes': 500,
+          'sample_window_seconds': 1.0,
+          'interfaces': ['lo'],
+        },
+        'gpu_devices': [
+          {'id': '0', 'name': 'TestGPU', 'vendor': 'TestVendor'},
+        ],
+      };
+      final sys = SystemTelemetry.fromJson(json);
+      expect(sys.cpu!.usagePercent, 10.0);
+      expect(sys.memory!.usedBytes, 1000);
+      expect(sys.network!.interfaces, ['lo']);
+      expect(sys.gpuDevices.length, 1);
+      expect(sys.gpuDevices[0].name, 'TestGPU');
+    });
+
+    test('handles null cpu and memory', () {
+      final json = {
+        'cpu': null,
+        'memory': null,
+        'network': null,
+        'gpu_devices': [],
+      };
+      final sys = SystemTelemetry.fromJson(json);
+      expect(sys.cpu, isNull);
+      expect(sys.memory, isNull);
+      expect(sys.network, isNull);
+      expect(sys.gpuDevices.isEmpty, true);
+    });
+  });
 }

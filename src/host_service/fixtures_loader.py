@@ -15,6 +15,7 @@ class FixtureType(Enum):
     SUCCESS = "success"
     EMPTY = "empty"
     ERROR = "error"
+    TELEMETRY_ONLY = "telemetry_only"
 
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"

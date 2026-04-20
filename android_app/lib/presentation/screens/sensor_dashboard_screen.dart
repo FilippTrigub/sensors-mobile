@@ -133,6 +133,11 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
 
   Widget _buildSuccessState(BuildContext context, SensorData data) {
     final isStale = widget.controller.currentState.isDataStale;
+    final telemetryWidget = _buildSystemTelemetrySection(data, context);
+    final warningsWidget =
+        (data.collectionWarnings != null && data.collectionWarnings!.isNotEmpty)
+        ? _buildWarningsBanner(data.collectionWarnings!, context)
+        : null;
 
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
@@ -165,8 +170,13 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
                 ],
               ),
             ),
+          if (warningsWidget != null) warningsWidget,
           _buildHostInfo(context, data),
-          const SizedBox(height: 16),
+          if (telemetryWidget != null) ...[
+            const SizedBox(height: 16),
+            telemetryWidget,
+            const SizedBox(height: 16),
+          ],
           if (data.sensorGroups.isEmpty)
             const EmptyState()
           else
@@ -263,6 +273,367 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
     final displayValue = sensor.displayValueInUnit(widget.currentUnit);
     final displayUnit = sensor.displayUnitIn(widget.currentUnit);
     return '${displayValue.toStringAsFixed(2)} $displayUnit';
+  }
+
+  // ---------------------------------------------------------------------------
+  // System Telemetry Section
+  // ---------------------------------------------------------------------------
+
+  /// Builds the system telemetry section.
+  ///
+  /// Returns null when telemetry is absent so the caller can skip rendering.
+  Widget? _buildSystemTelemetrySection(SensorData data, BuildContext context) {
+    final telemetry = data.systemTelemetry;
+    if (telemetry == null) return null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTelemetrySectionHeader(context),
+        const SizedBox(height: 12),
+        if (telemetry.cpu != null) _buildCpuCard(telemetry.cpu!, context),
+        if (telemetry.cpu != null) const SizedBox(height: 12),
+        if (telemetry.memory != null)
+          _buildMemoryCard(telemetry.memory!, context),
+        if (telemetry.memory != null) const SizedBox(height: 12),
+        if (telemetry.network != null)
+          _buildNetworkCard(telemetry.network!, context),
+        if (telemetry.network != null) const SizedBox(height: 12),
+        if (telemetry.gpuDevices.isNotEmpty)
+          ...telemetry.gpuDevices.map(
+            (gpu) => _buildGpuDeviceCard(gpu, context),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTelemetrySectionHeader(BuildContext context) {
+    return Row(
+      children: [
+        Icon(Icons.monitor_heart, size: 20, color: Colors.blue[700]),
+        const SizedBox(width: 8),
+        Text(
+          'System Telemetry',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Colors.blue[700],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCpuCard(CpuTelemetry cpu, BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.memory, color: Colors.blue[700]),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CPU',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${cpu.usagePercent.toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMemoryCard(MemoryTelemetry memory, BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.dock, color: Colors.purple[700]),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RAM',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_formatBytes(memory.usedBytes)} / ${_formatBytes(memory.totalBytes)}',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  LinearProgressIndicator(
+                    value: memory.usagePercent / 100,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.purple[700]!,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${memory.usagePercent.toStringAsFixed(1)}% used',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNetworkCard(NetworkTelemetry network, BuildContext context) {
+    final interfaceSummary = network.interfaces.isNotEmpty
+        ? network.interfaces.length <= 3
+              ? network.interfaces.join(', ')
+              : '${network.interfaces.length} interfaces'
+        : 'no interfaces';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.wifi, color: Colors.teal[700]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Network',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.arrow_downward,
+                            size: 16,
+                            color: Colors.teal[700],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_formatBytesThroughput(network.rxBytesPerSec)}/s',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(width: 16),
+                          Icon(
+                            Icons.arrow_upward,
+                            size: 16,
+                            color: Colors.teal[700],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_formatBytesThroughput(network.txBytesPerSec)}/s',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              interfaceSummary,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGpuDeviceCard(GpuDeviceTelemetry gpu, BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.graphic_eq, color: Colors.orange[700]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    gpu.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  gpu.vendor,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            if (gpu.utilizationPercent != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'Utilization:',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 100,
+                    child: LinearProgressIndicator(
+                      value: gpu.utilizationPercent! / 100,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.orange[700]!,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${gpu.utilizationPercent!.toStringAsFixed(1)}%',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (gpu.memoryUsedBytes != null && gpu.memoryTotalBytes != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'VRAM: ${_formatBytes(gpu.memoryUsedBytes!)} / ${_formatBytes(gpu.memoryTotalBytes!)}'
+                  '${gpu.memoryUsagePercent != null ? ' (${gpu.memoryUsagePercent!.toStringAsFixed(1)}%)' : ''}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    final mb = kb / 1024;
+    if (mb < 1024) return '${mb.toStringAsFixed(1)} MB';
+    final gb = mb / 1024;
+    if (gb < 1024) return '${gb.toStringAsFixed(1)} GiB';
+    return '${(gb / 1024).toStringAsFixed(1)} TB';
+  }
+
+  String _formatBytesThroughput(double bytesPerSec) {
+    if (bytesPerSec < 1024) return '${bytesPerSec.toStringAsFixed(0)} B/s';
+    final kb = bytesPerSec / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB/s';
+    final mb = kb / 1024;
+    if (mb < 1024) return '${mb.toStringAsFixed(1)} MB/s';
+    final gb = mb / 1024;
+    return '${gb.toStringAsFixed(2)} GB/s';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Collection Warnings Banner
+  // ---------------------------------------------------------------------------
+
+  /// Builds a non-blocking warnings banner/list.
+  ///
+  /// Returns null when there are no warnings.
+  Widget? _buildWarningsBanner(
+    List<CollectionWarning> warnings,
+    BuildContext context,
+  ) {
+    if (warnings.isEmpty) return null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.amber[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.amber[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.amber[800]),
+                const SizedBox(width: 8),
+                Text(
+                  'Collection Warnings',
+                  style: TextStyle(
+                    color: Colors.amber[800],
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 0.5),
+          ...warnings.map(
+            (w) => Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 16, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(w.message, style: TextStyle(color: Colors.amber[900])),
+                  if (w.code.isNotEmpty)
+                    Text(
+                      w.code,
+                      style: TextStyle(color: Colors.amber[700], fontSize: 11),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildErrorState(BuildContext context, SensorControllerState state) {

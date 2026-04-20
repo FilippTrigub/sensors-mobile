@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the packaging and runtime deployment strategy for the Python Flask companion service that provides lm-sensors data to the Android Flutter client.
+This document defines the packaging and runtime deployment strategy for the Python Flask companion service that provides lm-sensors data and system telemetry to the Android Flutter client.
 
 **Scope:** MVP deployment on private network/Tailscale, no authentication, no cloud infrastructure.
 
@@ -40,6 +40,22 @@ The `cockpit-sensors.spec.in` file will need to be extended to:
 - Install the `host_service/` directory to `/usr/lib/cockpit-sensors/host_service/`
 - Install `requirements.txt` to `/usr/lib/cockpit-sensors/requirements.txt`
 - Optionally install a systemd service unit file (see Section 2)
+
+---
+
+## 1b. Telemetry Expansion
+
+The companion service has been extended beyond lm-sensors to include additive system telemetry:
+
+- **CPU telemetry** — Usage percentage derived from `/proc/stat`
+- **Memory (RAM) telemetry** — Usage percentage and bytes from `/proc/meminfo`
+- **Network telemetry** — Active interfaces (excluding `lo`) with RX/TX throughput
+- **GPU/VRAM telemetry** — Optional, NVIDIA-first via `nvidia-smi`; absent drivers or missing `nvidia-smi` yield `gpu_devices: []` without error
+- **Collection warnings** — Non-fatal issues in any subsystem surface here rather than as payload errors
+
+The payload version for telemetry-enabled responses is `1.1`. The API accepts `1.0` payloads for backward compatibility. When lm-sensors data is unavailable the API may still return telemetry data alongside `collection_warnings` rather than an error, since telemetry collection is additive and non-fatal.
+
+GPU telemetry requires `nvidia-smi` on the host. AMD and Intel GPU support is not currently implemented.
 
 ---
 

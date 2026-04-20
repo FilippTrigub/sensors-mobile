@@ -548,5 +548,206 @@ void main() {
         );
       });
     });
+
+    // -------------------------------------------------------------------
+    // TELEMETRY PAYLOAD TESTS (v1.1)
+    // -------------------------------------------------------------------
+
+    group('Telemetry payload parsing', () {
+      test('fetchSensors parses 1.1 payload with full telemetry', () async {
+        final mockResponse = http.Response(
+          '''{
+            "version": "1.1",
+            "host_identity": {
+              "hostname": "telemetry-host",
+              "fqdn": "telemetry.local",
+              "platform": "Linux"
+            },
+            "timestamp": "2024-01-01T00:00:00Z",
+            "sensor_groups": [],
+            "status": {
+              "code": "OK",
+              "message": "OK"
+            },
+            "system_telemetry": {
+              "cpu": {"usage_percent": 42.0},
+              "memory": {
+                "used_bytes": 4294967296,
+                "total_bytes": 8589934592,
+                "usage_percent": 50.0
+              },
+              "network": {
+                "rx_bytes_per_sec": 1024.0,
+                "tx_bytes_per_sec": 512.0,
+                "total_rx_bytes": 1000000,
+                "total_tx_bytes": 500000,
+                "sample_window_seconds": 1.0,
+                "interfaces": ["eth0"]
+              },
+              "gpu_devices": [
+                {
+                  "id": "0000:01:00.0",
+                  "name": "RTX 4060",
+                  "vendor": "NVIDIA",
+                  "utilization_percent": 25.0,
+                  "memory_used_bytes": 1073741824,
+                  "memory_total_bytes": 8589934592,
+                  "memory_usage_percent": 12.5
+                }
+              ]
+            },
+            "collection_warnings": []
+          }''',
+          200,
+          headers: {'Content-Type': 'application/json'},
+        );
+
+        when(mockHttpClient.get(any)).thenAnswer((_) async => mockResponse);
+
+        final result = await client.fetchSensors(
+          'http://test:5000/api/v1/sensors',
+        );
+
+        expect(result.version, '1.1');
+        expect(result.systemTelemetry, isNotNull);
+        expect(result.systemTelemetry!.cpu!.usagePercent, 42.0);
+        expect(result.systemTelemetry!.memory!.usagePercent, 50.0);
+        expect(result.systemTelemetry!.network!.rxBytesPerSec, 1024.0);
+        expect(result.systemTelemetry!.gpuDevices.length, 1);
+        expect(result.systemTelemetry!.gpuDevices[0].name, 'RTX 4060');
+        expect(result.collectionWarnings, isNotNull);
+        expect(result.collectionWarnings!.isEmpty, true);
+      });
+
+      test('fetchSensors parses payload with warnings', () async {
+        final mockResponse = http.Response(
+          '''{
+            "version": "1.1",
+            "host_identity": {
+              "hostname": "warn-host",
+              "fqdn": "warn.local",
+              "platform": "Linux"
+            },
+            "timestamp": "2024-01-01T00:00:00Z",
+            "sensor_groups": [],
+            "status": {
+              "code": "OK",
+              "message": "OK"
+            },
+            "system_telemetry": {
+              "cpu": {"usage_percent": 5.0},
+              "memory": {
+                "used_bytes": 1000,
+                "total_bytes": 2000,
+                "usage_percent": 50.0
+              },
+              "network": null,
+              "gpu_devices": []
+            },
+            "collection_warnings": [
+              {
+                "source": "network",
+                "code": "NETWORK_SAMPLE_UNAVAILABLE",
+                "message": "Network counters unavailable"
+              },
+              {
+                "source": "gpu",
+                "code": "GPU_NOT_SUPPORTED",
+                "message": "No GPU found"
+              }
+            ]
+          }''',
+          200,
+          headers: {'Content-Type': 'application/json'},
+        );
+
+        when(mockHttpClient.get(any)).thenAnswer((_) async => mockResponse);
+
+        final result = await client.fetchSensors(
+          'http://test:5000/api/v1/sensors',
+        );
+
+        expect(result.systemTelemetry, isNotNull);
+        expect(result.systemTelemetry!.network, isNull);
+        expect(result.collectionWarnings, isNotNull);
+        expect(result.collectionWarnings!.length, 2);
+        expect(result.collectionWarnings![0].source, 'network');
+        expect(result.collectionWarnings![1].code, 'GPU_NOT_SUPPORTED');
+      });
+
+      test(
+        'fetchSensors handles legacy 1.0 payload without telemetry',
+        () async {
+          final mockResponse = http.Response(
+            '''{
+            "version": "1.0",
+            "host_identity": {
+              "hostname": "legacy-host",
+              "fqdn": "legacy.local",
+              "platform": "Linux"
+            },
+            "timestamp": "2024-01-01T00:00:00Z",
+            "sensor_groups": [],
+            "status": {
+              "code": "OK",
+              "message": "OK"
+            }
+          }''',
+            200,
+            headers: {'Content-Type': 'application/json'},
+          );
+
+          when(mockHttpClient.get(any)).thenAnswer((_) async => mockResponse);
+
+          final result = await client.fetchSensors(
+            'http://test:5000/api/v1/sensors',
+          );
+
+          expect(result.version, '1.0');
+          expect(result.systemTelemetry, isNull);
+          expect(result.collectionWarnings, isNull);
+        },
+      );
+
+      test('fetchSensors handles telemetry with null sub-fields', () async {
+        final mockResponse = http.Response(
+          '''{
+            "version": "1.1",
+            "host_identity": {
+              "hostname": "partial-telemetry",
+              "fqdn": "partial.local",
+              "platform": "Linux"
+            },
+            "timestamp": "2024-01-01T00:00:00Z",
+            "sensor_groups": [],
+            "status": {
+              "code": "OK",
+              "message": "Partial telemetry"
+            },
+            "system_telemetry": {
+              "cpu": null,
+              "memory": null,
+              "network": null,
+              "gpu_devices": []
+            },
+            "collection_warnings": []
+          }''',
+          200,
+          headers: {'Content-Type': 'application/json'},
+        );
+
+        when(mockHttpClient.get(any)).thenAnswer((_) async => mockResponse);
+
+        final result = await client.fetchSensors(
+          'http://test:5000/api/v1/sensors',
+        );
+
+        expect(result.version, '1.1');
+        expect(result.systemTelemetry!.cpu, isNull);
+        expect(result.systemTelemetry!.memory, isNull);
+        expect(result.systemTelemetry!.network, isNull);
+        expect(result.systemTelemetry!.gpuDevices.isEmpty, true);
+      });
+    });
   });
 }

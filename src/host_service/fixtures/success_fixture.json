@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "host_identity": {
     "hostname": "dev-server",
     "fqdn": "dev-server.local",
@@ -73,6 +73,36 @@
     "message": "Sensors data collected successfully",
     "last_updated": "2026-04-13T21:00:00Z"
   },
+  "system_telemetry": {
+    "cpu": {
+      "usage_percent": 18.4
+    },
+    "memory": {
+      "used_bytes": 6442450944,
+      "total_bytes": 17179869184,
+      "usage_percent": 37.5
+    },
+    "network": {
+      "rx_bytes_per_sec": 2048.5,
+      "tx_bytes_per_sec": 1024.25,
+      "total_rx_bytes": 987654321,
+      "total_tx_bytes": 123456789,
+      "sample_window_seconds": 1.0,
+      "interfaces": ["eth0", "wlan0"]
+    },
+    "gpu_devices": [
+      {
+        "id": "0000:01:00.0",
+        "name": "NVIDIA GeForce RTX 4060",
+        "vendor": "NVIDIA",
+        "utilization_percent": 24.0,
+        "memory_used_bytes": 1073741824,
+        "memory_total_bytes": 8589934592,
+        "memory_usage_percent": 12.5
+      }
+    ]
+  },
+  "collection_warnings": [],
   "units": {
     "temperature": "C"
   }
