@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:sensors/services/sensor_state_controller.dart';
 import 'package:sensors/services/sensor_api_client.dart';
 import 'package:sensors/repositories/host_config_repository.dart';
@@ -6,9 +7,19 @@ import 'package:sensors/repositories/user_preferences_repository.dart';
 import 'package:sensors/presentation/screens/host_setup_screen.dart';
 import 'package:sensors/presentation/screens/sensor_dashboard_screen.dart';
 import 'package:sensors/models/models.dart';
+import 'package:sensors/ad_config.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (AdConfig.adsEnabled) {
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e) {
+      // AdMob init failure should not block app startup.
+      debugPrint('AdMob initialization failed: $e');
+    }
+  }
 
   runApp(const MyApp());
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:sensors/ad_config.dart';
 import 'package:sensors/services/sensor_state_controller.dart';
 import 'package:sensors/models/models.dart';
 
@@ -87,7 +89,15 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
           }
         },
       ),
+      bottomNavigationBar: _buildAdBanner(),
     );
+  }
+
+  Widget _buildAdBanner() {
+    if (!AdConfig.adsEnabled || AdConfig.bannerUnitId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return const _AdBannerWidget();
   }
 
   Widget _buildUnitSelector(BuildContext context) {
@@ -684,6 +694,85 @@ class _SensorDashboardScreenState extends State<SensorDashboardScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Bottom AdMob banner widget for the dashboard.
+///
+/// Only renders when [AdConfig.adsEnabled] is true and a valid banner unit
+/// ID is configured. Fails gracefully — returns an empty widget on any
+/// load error so the dashboard layout is unaffected.
+class _AdBannerWidget extends StatefulWidget {
+  const _AdBannerWidget();
+
+  @override
+  State<_AdBannerWidget> createState() => _AdBannerWidgetState();
+}
+
+class _AdBannerWidgetState extends State<_AdBannerWidget> {
+  BannerAd? _bannerAd;
+  bool _isLoaded = false;
+  bool _adDisabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initializeAd());
+  }
+
+  Future<void> _initializeAd() async {
+    if (!AdConfig.adsEnabled || AdConfig.bannerUnitId.isEmpty) {
+      setState(() => _adDisabled = true);
+      return;
+    }
+
+    final width = MediaQuery.of(context).size.width.truncate();
+    final size =
+        await AdSize.getLargeAnchoredAdaptiveBannerAdSizeWithOrientation(
+          Orientation.portrait,
+          width,
+        );
+
+    if (size == null || !mounted) {
+      setState(() => _adDisabled = true);
+      return;
+    }
+
+    _bannerAd = BannerAd(
+      adUnitId: AdConfig.bannerUnitId,
+      size: size,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) return;
+          setState(() {
+            _bannerAd = ad as BannerAd;
+            _isLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          if (!mounted) return;
+          ad.dispose();
+          setState(() => _adDisabled = true);
+        },
+      ),
+    );
+
+    _bannerAd!.load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_adDisabled || !_isLoaded || _bannerAd == null) {
+      return const SizedBox.shrink();
+    }
+    return SafeArea(child: AdWidget(ad: _bannerAd!));
   }
 }
 

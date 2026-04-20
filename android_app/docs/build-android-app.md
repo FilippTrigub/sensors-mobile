@@ -110,3 +110,46 @@ If the build fails, confirm:
 - `flutter.sdk` in `android/local.properties` points to the active Flutter install
 - `sdk.dir` points to the Android SDK
 - Java version is compatible with the Android Gradle plugin
+
+## 9. AdMob Ads
+
+The app supports AdMob ads via build-time `--dart-define` flags. Ads are **disabled by default** in dev and debug builds so you don't hit quota limits while developing.
+
+### Available dart-define keys
+
+| Key | Description | Format | Default |
+|-----|-------------|--------|---------|
+| `ADS_ENABLED` | Enable or disable ads for this build | `true` or `false` | `false` |
+| `ADMOB_APP_ID` | AdMob application ID for Android | `ca-app-pub-XXXXXXXX~YYYYYYYY` | `''` (empty) |
+| `ADMOB_BANNER_UNIT_ID` | Admob banner ad unit ID for Android | `ca-app-pub-XXXXXXXX/YYYYYYYY` | `''` (empty) |
+
+### Dev build (ads disabled)
+
+No flags needed. Ads stay off by default:
+
+```bash
+flutter run -d <device-id>
+```
+
+Or build a release APK without ads:
+
+```bash
+flutter build apk --release
+```
+
+### Test build (ads enabled with Google test IDs)
+
+```bash
+flutter run --dart-define=ADS_ENABLED=true \
+  --dart-define=ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713 \
+  --dart-define=ADMOB_BANNER_UNIT_ID=ca-app-pub-3940256099942544/6300978111 \
+  -d <device-id>
+```
+
+### Banner scope
+
+The AdMob banner appears **only on the dashboard screen** (the main sensor data screen). It does not appear on the host setup screen where you enter the Tailscale or LAN IP address.
+
+### Production note
+
+The test commands above use Google's test ad IDs. Before releasing the app, replace those values with your production AdMob App ID and Banner Unit ID, and update the `APPLICATION_ID` meta-data in `android/app/src/main/AndroidManifest.xml`.
