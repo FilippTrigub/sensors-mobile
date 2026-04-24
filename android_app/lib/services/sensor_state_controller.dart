@@ -320,6 +320,22 @@ class SensorStateController extends ChangeNotifier {
     await _performFetch();
   }
 
+  /// Trigger an immediate foreground refresh when the app resumes.
+  ///
+  /// This keeps the existing polling model intact while avoiding a stale error
+  /// state lingering on screen until the next periodic poll fires.
+  Future<void> onAppResumed() async {
+    if (_currentState.state == UiState.loading) {
+      return;
+    }
+
+    if (_currentEndpointUrl == null && _configuredHostInput == null) {
+      return;
+    }
+
+    await refresh();
+  }
+
   /// Reset to setup state (e.g., when clearing host config)
   void resetToSetup() {
     stopPolling();

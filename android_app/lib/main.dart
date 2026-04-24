@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:sensors/services/sensor_state_controller.dart';
@@ -31,7 +33,7 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late final SensorStateController _controller;
   late final HostConfigRepository _hostConfigRepository;
   late final UserPreferencesRepository _userPrefs;
@@ -41,6 +43,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _hostConfigRepository = HostConfigRepository();
     _userPrefs = UserPreferencesRepository();
 
@@ -50,6 +54,19 @@ class _MyAppState extends State<MyApp> {
     );
 
     _loadInitialConfig();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state != AppLifecycleState.resumed ||
+        _isLoadingInitialConfig ||
+        _currentHostConfig == null) {
+      return;
+    }
+
+    unawaited(_controller.onAppResumed());
   }
 
   Future<void> _loadInitialConfig() async {
@@ -115,6 +132,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
   }

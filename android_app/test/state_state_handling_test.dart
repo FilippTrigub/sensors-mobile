@@ -376,6 +376,36 @@ void main() {
     // ---------------------------------------------------------------------
 
     group('Retry behavior', () {
+      test('App resume triggers immediate retry from error state', () async {
+        var requestCount = 0;
+        final httpClient = MockClient((request) async {
+          requestCount += 1;
+
+          if (requestCount <= 2) {
+            throw http.ClientException('temporary network issue');
+          }
+
+          return http.Response(
+            '{"version":"1.0","host_identity":{"hostname":"test-host","fqdn":"test.local","platform":"Linux"},"timestamp":"${DateTime.now().toIso8601String()}","sensor_groups":[],"status":{"code":"OK","message":"OK"}}',
+            200,
+            headers: {'Content-Type': 'application/json'},
+          );
+        });
+        final apiClient = SensorApiClient(httpClient: httpClient);
+        final controller = SensorStateController(apiClient: apiClient);
+
+        await controller.setHostConfig('test-host');
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        expect(controller.isError, isTrue);
+        expect(requestCount, equals(2));
+
+        await controller.onAppResumed();
+
+        expect(controller.isSuccess, isTrue);
+        expect(requestCount, equals(3));
+      });
+
       test('Error state can be refreshed to loading state', () async {
         // Arrange - first fail
         final failedClient = MockClient(
